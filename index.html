@@ -4,7 +4,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKCT 연습</title>
 <style>
-  body { font: 18px/1.6 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; }
+  body { font: 18px/1.6 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; background: #fff; color: #111; }
+  html { background: #fff; }
   button { font: inherit; padding: 10px 16px; margin: 4px 4px 4px 0; cursor: pointer; touch-action: manipulation; }
   fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; min-width: 0; }
   label { display: block; padding: 10px 0; cursor: pointer; touch-action: manipulation; } /* 손가락으로 누르기 쉬운 높이 */
@@ -14,8 +15,20 @@
   #bar { position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 2px solid #333; display: flex; justify-content: space-between; }
   .ok { color: #0a7a2f; } .no { color: #c22; }
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
+  #tools { position: fixed; right: 8px; top: 64px; width: 250px; display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
+  #tools[hidden] { display: none; }
+  #tools input, #tools textarea { font: inherit; width: 100%; box-sizing: border-box; }
+  @media (max-width: 1340px) { #tools { position: static; width: auto; margin-top: 16px; } } /* 옆 공간이 없으면 문제 아래로 */
 </style>
 <main id="app"></main>
+<!-- 실전 프로그램에도 화면 안 계산기와 메모장이 있다(종이·펜은 금지). 문제마다 비운다 -->
+<aside id="tools" hidden>
+  <b>계산기</b>
+  <input id="calc" autocomplete="off" placeholder="예: (8*300+12*200)/500" aria-label="계산기 식 입력">
+  <output id="res" for="calc">&nbsp;</output>
+  <b>메모장</b>
+  <textarea id="memo" rows="8" aria-label="메모장"></textarea>
+</aside>
 <script src="questions.js"></script>
 <script>
 const app = document.getElementById('app');
@@ -58,11 +71,25 @@ function statsHtml() {
       .map(([a, t, v]) => [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? Math.round(v.s / v.k) + '초' : '-']));
 }
 
+const calcEl = document.getElementById('calc'), res = document.getElementById('res'); // calc는 questions.js의 연산 출제기 이름
+calcEl.oninput = () => {
+  const s = calcEl.value.replace(/×/g, '*').replace(/÷/g, '/');
+  let v = '';
+  if (/^[\d+\-*/().\s]+$/.test(s)) try { v = +Function(`"use strict"; return (${s})`)().toFixed(6); } catch {} // 숫자·사칙연산·괄호만 계산
+  res.textContent = v === '' || !isFinite(v) ? ' ' : '= ' + v.toLocaleString('ko-KR', { maximumFractionDigits: 6 });
+};
+function tools(on) {
+  document.getElementById('tools').hidden = !on;
+  calcEl.value = document.getElementById('memo').value = '';
+  res.textContent = ' ';
+}
+
 function home() {
   clearInterval(timer);
   document.onkeydown = null;
+  tools(false);
   app.innerHTML = `<h1>SKCT 연습 (전임직)</h1>
-    <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다.</p>
+    <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다. 문제를 풀 때 화면에 계산기와 메모장이 나옵니다. 실전처럼 종이와 펜 없이 푸세요.</p>
     <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>실전처럼 한 문제씩 나오고, 넘긴 문제로는 되돌아갈 수 없습니다. 시간이 끝나면 자동 종료됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a} (${CONF[a][0]}문항 ${CONF[a][1] / 60}분)</button>`).join('')}
     <h2>3. 실전 모의고사</h2><p>4개 영역을 이어서 봅니다(${TOTAL}문항 ${TOTAL_MIN}분). 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
@@ -107,11 +134,13 @@ function start(area, done, title = area) {
     app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
       `<button>${last ? (done ? '영역 종료하고 다음으로' : '종료') : '다음 문제 (되돌아갈 수 없음)'}</button></form>`;
     app.querySelector('form').onsubmit = e => { e.preventDefault(); save(); if (++i < qs.length) show(); else grade(); };
+    tools(true);
     tick();
     scrollTo(0, 0);
   };
   const grade = () => {
     clearInterval(timer);
+    tools(false);
     let score = 0;
     const body = qs.map((q, k) => {
       const m = mine[k] ?? null, ok = m === q.answer;
@@ -177,7 +206,9 @@ function drill() {
       b.focus(); // Enter로 바로 다음 문제
     };
     inputs.forEach((el, j) => el.onchange = () => answer(j));
-    document.onkeydown = e => { if (/^[0-5]$/.test(e.key)) answer(e.key - 1); }; // 0 = 모르겠음
+    // 0 = 모르겠음. 계산기·메모장에 숫자를 칠 때는 답으로 처리하지 않는다
+    document.onkeydown = e => { if (/^[0-5]$/.test(e.key) && !e.target.closest('#tools')) answer(e.key - 1); };
+    tools(true);
     scrollTo(0, 0);
   };
   next();
