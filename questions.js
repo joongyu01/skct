@@ -413,7 +413,7 @@ const TYPES = {
   '자료해석': ['증가율', '가중평균', '비중', '인구밀도', '무역수지', '비율 비교', '평균 초과'],
 };
 const gen = area => { const i = R(0, GEN[area].length - 1), q = GEN[area][i](); q.type ??= TYPES[area][i]; return q; };
-const typeOf = q => q.type || (/일치/.test(q.q) ? '내용 일치' : /주제/.test(q.q) ? '주제' : /배열/.test(q.q) ? '순서 배열' : /빈칸/.test(q.q) ? '빈칸' : /추론|반박|약화/.test(q.q) ? '추론·반박' : '기타');
+const typeOf = q => q.type || (/일치/.test(q.q) ? '내용 일치' : /주제/.test(q.q) ? '주제' : /배열/.test(q.q) ? '문단 배열' : /빈칸/.test(q.q) ? '빈칸' : /반박|약화/.test(q.q) ? '반박·사례' : /추론/.test(q.q) ? '추론' : '기타');
 
 // ═════════ 전임직(Maintenance/Operator) 전용: 언어표현, 연산 ═════════
 // 언어표현 유형은 2026년 전임직 대비 유튜브 영상(문제풀이·미니테스트) 요약을 근거로 했다. 공식 기출은 아니다.
@@ -592,7 +592,7 @@ GEN['언어표현'].push(
     return choiceQ('언어표현', toP ? `다음 뜻에 해당하는 속담은?<p>${m}</p>` : `다음 속담의 뜻은?<p><b>${p}</b></p>`, toP ? p : m, others(PROVERB, i, toP ? 0 : 1), `${p}: ${m}`);
   },
 );
-TYPES['언어표현'].push('단어 관계', '연상어', '문맥 빈칸', '속담');
+TYPES['언어표현'].push('어휘관계', '연상어', '문맥 빈칸', '속담');
 
 GEN['창의수리'].push(() => {
   const p1 = R(5, 12) * 100, p2 = p1 - R(1, 4) * 100, n = R(8, 15), x = R(2, n - 2), total = p1 * x + p2 * (n - x);

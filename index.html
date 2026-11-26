@@ -34,6 +34,7 @@
   <canvas id="pad" width="500" height="380" aria-label="그림판. 마우스로 끌어서 씁니다"></canvas>
 </aside>
 <script src="questions.js"></script>
+<script src="bank-data.js"></script>
 <script>
 const app = document.getElementById('app');
 const NUM = '①②③④⑤';
@@ -150,10 +151,11 @@ function home() {
 function build(area) {
   const gens = GEN[area] || [], count = CONF[area][0];
   const qs = shuffle(QUESTIONS.filter(q => q.area === area)).slice(0, gens.length ? Math.floor(count / 2) : count);
-  const seen = new Set(qs.map(q => q.q));
+  const id = q => q.q + '|' + q.choices[q.answer]; // 문장과 정답이 같으면 같은 문제로 본다
+  const seen = new Set(qs.map(id));
   for (let guard = 0; gens.length && qs.length < count && guard < 500; guard++) {
     const q = gen(area);
-    if (!seen.has(q.q)) { seen.add(q.q); qs.push(q); }
+    if (!seen.has(id(q))) { seen.add(id(q)); qs.push(q); }
   }
   qs.forEach(q => console.assert(new Set(q.choices).size === 5 && q.answer >= 0 && q.answer < 5, '문제 형식 오류', q));
   return shuffle(qs);
