@@ -17,15 +17,17 @@
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
   #tools { position: fixed; right: 8px; top: 64px; width: 250px; display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
   #tools[hidden] { display: none; }
-  #tools input, #tools textarea { font: inherit; width: 100%; box-sizing: border-box; }
+  #tools textarea { font: inherit; width: 100%; box-sizing: border-box; }
+  #res { display: block; text-align: right; border: 1px solid #ccc; padding: 6px; min-height: 1.6em; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  #keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
+  #keys button { margin: 0; padding: 8px 0; }
   @media (max-width: 1340px) { #tools { position: static; width: auto; margin-top: 16px; } } /* 옆 공간이 없으면 문제 아래로 */
 </style>
 <main id="app"></main>
 <!-- 실전 프로그램에도 화면 안 계산기와 메모장이 있다(종이·펜은 금지). 문제마다 비운다 -->
 <aside id="tools" hidden>
   <b>계산기</b>
-  <input id="calc" autocomplete="off" placeholder="예: (8*300+12*200)/500" aria-label="계산기 식 입력">
-  <output id="res" for="calc">&nbsp;</output>
+  <div id="calc" tabindex="0" aria-label="계산기. 클릭한 뒤 키보드로도 입력할 수 있습니다"><output id="res">0</output><div id="keys"></div></div>
   <b>메모장</b>
   <textarea id="memo" rows="8" aria-label="메모장"></textarea>
 </aside>
@@ -71,17 +73,33 @@ function statsHtml() {
       .map(([a, t, v]) => [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? Math.round(v.s / v.k) + '초' : '-']));
 }
 
-const calcEl = document.getElementById('calc'), res = document.getElementById('res'); // calc는 questions.js의 연산 출제기 이름
-calcEl.oninput = () => {
-  const s = calcEl.value.replace(/×/g, '*').replace(/÷/g, '/');
-  let v = '';
-  if (/^[\d+\-*/().\s]+$/.test(s)) try { v = +Function(`"use strict"; return (${s})`)().toFixed(6); } catch {} // 숫자·사칙연산·괄호만 계산
-  res.textContent = v === '' || !isFinite(v) ? ' ' : '= ' + v.toLocaleString('ko-KR', { maximumFractionDigits: 6 });
+// 실전 프로그램의 계산기처럼: 괄호 없음, 사칙연산과 루트만, 누르는 순서대로 계산(2 + 3 × 4 = 20)
+const res = document.getElementById('res'), keys = document.getElementById('keys');
+const OPS = { '+': (a, b) => a + b, '−': (a, b) => a - b, '×': (a, b) => a * b, '÷': (a, b) => a / b };
+const num = v => String(+v.toFixed(8));
+let cur, acc, op, fresh; // cur 입력 중인 수(문자열), acc 누적값, op 대기 중인 연산, fresh 다음 숫자가 새 수의 시작인지
+function press(k) {
+  if (/[\d.]/.test(k)) {
+    if (fresh) { cur = ''; fresh = false; }
+    if (k !== '.') cur += k; else if (!cur.includes('.')) cur += cur ? '.' : '0.';
+  }
+  else if (k in OPS) { acc = op && !fresh ? OPS[op](acc, +cur) : +cur; op = k; cur = num(acc); fresh = true; }
+  else if (k === '=') { if (op) { acc = OPS[op](acc, +cur); cur = num(acc); op = null; fresh = true; } }
+  else if (k === '√') { cur = num(Math.sqrt(+cur)); fresh = true; }
+  else if (k === '←') { if (!fresh) cur = cur.slice(0, -1); }
+  else { cur = '0'; acc = op = null; fresh = true; } // C
+  res.textContent = op ? `${num(acc)} ${op} ${fresh ? '' : cur}` : cur || '0';
+}
+keys.innerHTML = [...'789÷456×123−0.=+C←√'].map(k => `<button type="button">${k}</button>`).join('');
+keys.onclick = e => { if (e.target.tagName === 'BUTTON') press(e.target.textContent); };
+document.getElementById('calc').onkeydown = e => {
+  const k = { '*': '×', '/': '÷', '-': '−', Enter: '=', Backspace: '←', Escape: 'C' }[e.key] || e.key;
+  if (/^[\d.+=×÷−←C]$/.test(k)) { e.preventDefault(); press(k); } // preventDefault: 포커스된 버튼이 Enter로 또 눌리지 않게
 };
 function tools(on) {
   document.getElementById('tools').hidden = !on;
-  calcEl.value = document.getElementById('memo').value = '';
-  res.textContent = ' ';
+  document.getElementById('memo').value = '';
+  press('C');
 }
 
 function home() {
