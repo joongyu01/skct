@@ -5,10 +5,11 @@
 <title>SKCT 연습</title>
 <style>
   body { font: 16px/1.6 system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; }
-  button { font: inherit; padding: 10px 16px; margin: 4px 4px 4px 0; cursor: pointer; }
-  fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; }
-  label { display: block; padding: 4px 0; cursor: pointer; }
-  table { border-collapse: collapse; margin: 8px 0; }
+  button { font: inherit; padding: 10px 16px; margin: 4px 4px 4px 0; cursor: pointer; touch-action: manipulation; }
+  fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; min-width: 0; }
+  label { display: block; padding: 10px 0; cursor: pointer; touch-action: manipulation; } /* 손가락으로 누르기 쉬운 높이 */
+  input[type=radio] { width: 1.2em; height: 1.2em; vertical-align: text-bottom; }
+  table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; max-width: 100%; } /* 좁은 화면(스플릿 뷰)에서 표만 가로 스크롤 */
   th, td { border: 1px solid #999; padding: 4px 10px; text-align: center; }
   #bar { position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 2px solid #333; display: flex; justify-content: space-between; }
   .ok { color: #0a7a2f; } .no { color: #c22; }
@@ -55,13 +56,14 @@ function build(area) {
 // done이 있으면(모의고사) 채점 결과를 화면에 띄우지 않고 done(점수, 해설HTML)으로 넘긴다
 function start(area, done, title = area) {
   const qs = build(area);
-  let left = qs.length * SEC_PER_Q;
+  const end = Date.now() + qs.length * SEC_PER_Q * 1000; // 마감 시각 기준: 탭이 백그라운드로 가서 타이머가 멈춰도 시간이 맞게
   app.innerHTML = `<div id="bar"><b>${title}</b><span id="t" role="timer"></span></div><form>` +
     qs.map(qHtml).join('') + `<button>${done ? '제출하고 다음으로' : '제출'}</button></form>`;
   const form = app.querySelector('form'), t = document.getElementById('t');
   const tick = () => {
+    const left = Math.max(0, Math.round((end - Date.now()) / 1000));
     t.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
-    if (left-- <= 0) grade();
+    if (!left) grade();
   };
   const grade = () => {
     clearInterval(timer);
