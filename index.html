@@ -19,16 +19,24 @@
 const app = document.getElementById('app');
 const NUM = '①②③④⑤';
 const SEC_PER_Q = 45; // 실전 기준 20문항 15분
-let timer;
-
 const COUNT = 20;
 const AREAS = ['언어이해', '자료해석', '창의수리', '언어추리', '수열추리'];
+let timer;
+
+const qHtml = (q, i) => `<fieldset><legend>문제 ${i + 1}</legend><div>${q.q}</div>` +
+  q.choices.map((c, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${NUM[j]} ${c}</label>`).join('') + `</fieldset>`;
+const ansHtml = q => `정답: ${NUM[q.answer]} ${q.choices[q.answer]}<br>해설: ${q.explain}`;
 
 function home() {
   clearInterval(timer);
-  app.innerHTML = `<h1>SKCT 연습</h1><p>영역을 고르면 바로 시작합니다. ${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 시간이 끝나면 자동 제출됩니다. 언어이해를 뺀 영역은 풀 때마다 새 문제가 나옵니다.</p>` +
-    AREAS.map(a => `<button data-a="${a}">${a}</button>`).join('');
-  app.querySelectorAll('button').forEach(b => b.onclick = () => start(b.dataset.a));
+  document.onkeydown = null;
+  app.innerHTML = `<h1>SKCT 연습</h1>
+    <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제.</p><button id="drill">시작</button>
+    <h2>2. 영역별 연습</h2><p>${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 시간이 끝나면 자동 제출됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a}</button>`).join('')}
+    <h2>3. 실전 모의고사</h2><p>5개 영역을 이어서 봅니다(영역당 ${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 총 75분). 영역이 끝나면 되돌아갈 수 없고, 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>`;
+  app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => start(b.dataset.a));
+  document.getElementById('drill').onclick = drill;
+  document.getElementById('mock').onclick = mock;
 }
 
 // 출제기가 있는 영역은 고정 문제 2개 + 자동 출제, 없는 영역(언어이해)은 고정 문제만
@@ -44,13 +52,12 @@ function build(area) {
   return shuffle(qs);
 }
 
-function start(area) {
+// done이 있으면(모의고사) 채점 결과를 화면에 띄우지 않고 done(점수, 해설HTML)으로 넘긴다
+function start(area, done, title = area) {
   const qs = build(area);
   let left = qs.length * SEC_PER_Q;
-  app.innerHTML = `<div id="bar"><b>${area}</b><span id="t" role="timer"></span></div><form>` +
-    qs.map((q, i) => `<fieldset><legend>문제 ${i + 1}</legend><div>${q.q}</div>` +
-      q.choices.map((c, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${NUM[j]} ${c}</label>`).join('') +
-      `</fieldset>`).join('') + `<button>제출</button></form>`;
+  app.innerHTML = `<div id="bar"><b>${title}</b><span id="t" role="timer"></span></div><form>` +
+    qs.map(qHtml).join('') + `<button>${done ? '제출하고 다음으로' : '제출'}</button></form>`;
   const form = app.querySelector('form'), t = document.getElementById('t');
   const tick = () => {
     t.textContent = `${Math.floor(left / 60)}:${String(left % 60).padStart(2, '0')}`;
@@ -64,16 +71,63 @@ function start(area) {
       const mine = fd.get('q' + i), ok = mine !== null && +mine === q.answer;
       if (ok) score++;
       return `<fieldset><legend class="${ok ? 'ok' : 'no'}">문제 ${i + 1} ${ok ? '정답' : '오답'}</legend><div>${q.q}</div>` +
-        `<p>내 답: ${mine === null ? '안 풂' : NUM[mine] + ' ' + q.choices[mine]}<br>정답: ${NUM[q.answer]} ${q.choices[q.answer]}<br>해설: ${q.explain}</p></fieldset>`;
+        `<p>내 답: ${mine === null ? '안 풂' : NUM[mine] + ' ' + q.choices[mine]}<br>${ansHtml(q)}</p></fieldset>`;
     }).join('');
+    scrollTo(0, 0);
+    if (done) return done(score, body);
     app.innerHTML = `<h1>${area}: ${score} / ${qs.length}</h1>${body}<button id="home">처음으로</button>`;
     document.getElementById('home').onclick = home;
-    scrollTo(0, 0);
   };
   form.onsubmit = e => { e.preventDefault(); grade(); };
   tick();
   timer = setInterval(tick, 1000);
   scrollTo(0, 0);
+}
+
+function mock() {
+  const res = [];
+  const step = i => {
+    if (i < AREAS.length) return start(AREAS[i], (score, body) => { res.push({ score, body }); step(i + 1); }, `${i + 1}/5 ${AREAS[i]}`);
+    app.innerHTML = `<h1>모의고사: ${res.reduce((a, r) => a + r.score, 0)} / ${AREAS.length * COUNT}</h1>` +
+      res.map((r, k) => `<details><summary>${AREAS[k]}: ${r.score} / ${COUNT} (해설 보기)</summary>${r.body}</details>`).join('') +
+      `<button id="home">처음으로</button>`;
+    document.getElementById('home').onclick = home;
+  };
+  step(0);
+}
+
+function drill() {
+  const fixed = {}; // 영역별 고정 문제 대기열: 다 쓸 때까지 같은 지문이 다시 안 나오게
+  const one = area => {
+    const gens = GEN[area] || [];
+    if (gens.length && Math.random() < 0.9) return pick(gens)();
+    if (!fixed[area]?.length) fixed[area] = shuffle(QUESTIONS.filter(q => q.area === area));
+    return fixed[area].pop();
+  };
+  let n = 0, right = 0;
+  const next = () => {
+    const q = one(pick(AREAS)), t0 = Date.now();
+    let answered = false;
+    app.innerHTML = `<div id="bar"><b>${q.area}</b><span>맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"></div><button id="home">그만하기</button>`;
+    document.getElementById('home').onclick = home;
+    const inputs = [...app.querySelectorAll('input')];
+    const answer = j => {
+      if (answered) return;
+      answered = true;
+      const sec = Math.round((Date.now() - t0) / 1000), ok = j === q.answer;
+      n++; if (ok) right++;
+      inputs.forEach(el => el.disabled = true);
+      inputs[j].checked = true;
+      document.getElementById('fb').innerHTML = `<p><b class="${ok ? 'ok' : 'no'}">${ok ? '정답' : '오답'}</b> · ${sec}초 걸림${sec > SEC_PER_Q ? ` (실전 기준 ${SEC_PER_Q}초 초과)` : ''}<br>${ansHtml(q)}</p><button id="next">다음 문제</button>`;
+      const b = document.getElementById('next');
+      b.onclick = next;
+      b.focus(); // Enter로 바로 다음 문제
+    };
+    inputs.forEach((el, j) => el.onchange = () => answer(j));
+    document.onkeydown = e => { if (/^[1-5]$/.test(e.key)) answer(e.key - 1); };
+    scrollTo(0, 0);
+  };
+  next();
 }
 
 home();
