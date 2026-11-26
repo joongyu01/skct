@@ -4,7 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKCT 연습</title>
 <style>
-  body { font: 16px/1.6 system-ui, sans-serif; max-width: 720px; margin: 0 auto; padding: 16px; }
+  body { font: 18px/1.6 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; }
   button { font: inherit; padding: 10px 16px; margin: 4px 4px 4px 0; cursor: pointer; touch-action: manipulation; }
   fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; min-width: 0; }
   label { display: block; padding: 10px 0; cursor: pointer; touch-action: manipulation; } /* 손가락으로 누르기 쉬운 높이 */
@@ -28,13 +28,35 @@ const qHtml = (q, i) => `<fieldset><legend>문제 ${i + 1}</legend><div>${q.q}</
   q.choices.map((c, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${NUM[j]} ${c}</label>`).join('') + `</fieldset>`;
 const ansHtml = q => `정답: ${NUM[q.answer]} ${q.choices[q.answer]}<br>해설: ${q.explain}`;
 
+// 통계: 이 기기 브라우저(localStorage)에만 저장. { "영역|유형": {r 맞힌 수, n 푼 수, s 걸린 초 합, k 시간 잰 횟수} }
+const KEY = 'skct-stats';
+const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
+function record(q, ok, sec) {
+  const s = load(), v = s[q.area + '|' + typeOf(q)] ||= { r: 0, n: 0, s: 0, k: 0 };
+  v.n++; if (ok) v.r++;
+  if (sec != null) { v.s += sec; v.k++; }
+  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} // 사생활 보호 모드 등에서 저장이 막혀도 풀이는 계속
+}
+function statsHtml() {
+  const rows = Object.entries(load()).map(([k, v]) => [...k.split('|'), v]);
+  if (!rows.length) return '<p>아직 기록이 없습니다.</p>';
+  const pct = (r, n) => Math.round(r / n * 100) + '%';
+  const areas = AREAS.map(a => { const vs = rows.filter(x => x[0] === a).map(x => x[2]); return [a, sum(vs.map(v => v.r)), sum(vs.map(v => v.n))]; }).filter(x => x[2]);
+  return T(['영역', '정답률', '맞힘 / 푼 수'], areas.map(([a, r, n]) => [a, pct(r, n), `${r} / ${n}`])) +
+    '<p>유형별(정답률 낮은 순). 평균 시간은 익숙해지기에서 잰 값입니다.</p>' +
+    T(['영역', '유형', '정답률', '맞힘 / 푼 수', '평균 시간'], rows.sort((x, y) => x[2].r / x[2].n - y[2].r / y[2].n)
+      .map(([a, t, v]) => [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? Math.round(v.s / v.k) + '초' : '-']));
+}
+
 function home() {
   clearInterval(timer);
   document.onkeydown = null;
   app.innerHTML = `<h1>SKCT 연습</h1>
     <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 시간이 끝나면 자동 제출됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a}</button>`).join('')}
-    <h2>3. 실전 모의고사</h2><p>5개 영역을 이어서 봅니다(영역당 ${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 총 75분). 영역이 끝나면 되돌아갈 수 없고, 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>`;
+    <h2>3. 실전 모의고사</h2><p>5개 영역을 이어서 봅니다(영역당 ${COUNT}문항 ${COUNT * SEC_PER_Q / 60}분, 총 75분). 영역이 끝나면 되돌아갈 수 없고, 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
+    <h2>4. 내 기록</h2><p>세 모드에서 푼 문제가 모두 집계됩니다. 안 푼 문제는 틀린 것으로 셉니다. 기록은 이 기기에만 저장됩니다.</p>${statsHtml()}<button id="reset">기록 지우기</button>`;
+  document.getElementById('reset').onclick = () => { if (confirm('기록을 모두 지울까요? 되돌릴 수 없습니다.')) { localStorage.removeItem(KEY); home(); } };
   app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => start(b.dataset.a));
   document.getElementById('drill').onclick = drill;
   document.getElementById('mock').onclick = mock;
@@ -46,7 +68,7 @@ function build(area) {
   const qs = shuffle(QUESTIONS.filter(q => q.area === area)).slice(0, gens.length ? 2 : COUNT);
   const seen = new Set(qs.map(q => q.q));
   for (let guard = 0; gens.length && qs.length < COUNT && guard < 500; guard++) {
-    const q = pick(gens)();
+    const q = gen(area);
     if (!seen.has(q.q)) { seen.add(q.q); qs.push(q); }
   }
   qs.forEach(q => console.assert(new Set(q.choices).size === 5 && q.answer >= 0 && q.answer < 5, '문제 형식 오류', q));
@@ -72,6 +94,7 @@ function start(area, done, title = area) {
     const body = qs.map((q, i) => {
       const mine = fd.get('q' + i), ok = mine !== null && +mine === q.answer;
       if (ok) score++;
+      record(q, ok);
       return `<fieldset><legend class="${ok ? 'ok' : 'no'}">문제 ${i + 1} ${ok ? '정답' : '오답'}</legend><div>${q.q}</div>` +
         `<p>내 답: ${mine === null ? '안 풂' : NUM[mine] + ' ' + q.choices[mine]}<br>${ansHtml(q)}</p></fieldset>`;
     }).join('');
@@ -102,9 +125,9 @@ function drill() {
   const fixed = {}; // 영역별 고정 문제 대기열: 다 쓸 때까지 같은 지문이 다시 안 나오게
   const one = area => {
     const gens = GEN[area] || [];
-    if (gens.length && Math.random() < 0.9) return pick(gens)();
+    if (gens.length && Math.random() < 0.9) return gen(area);
     if (!fixed[area]?.length) fixed[area] = shuffle(QUESTIONS.filter(q => q.area === area));
-    return fixed[area].pop();
+    return fixed[area].pop() || gen(area); // 고정 문제가 없는 영역(수열추리·창의수리)은 출제기로
   };
   let n = 0, right = 0;
   const next = () => {
@@ -118,6 +141,7 @@ function drill() {
       answered = true;
       const sec = Math.round((Date.now() - t0) / 1000), ok = j === q.answer;
       n++; if (ok) right++;
+      record(q, ok, sec);
       inputs.forEach(el => el.disabled = true);
       inputs[j].checked = true;
       document.getElementById('fb').innerHTML = `<p><b class="${ok ? 'ok' : 'no'}">${ok ? '정답' : '오답'}</b> · ${sec}초 걸림${sec > SEC_PER_Q ? ` (실전 기준 ${SEC_PER_Q}초 초과)` : ''}<br>${ansHtml(q)}</p><button id="next">다음 문제</button>`;
