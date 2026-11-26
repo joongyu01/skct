@@ -122,6 +122,12 @@ function tools(on) {
   press('C');
 }
 
+// 저장 상태 문구. 서버와 주고받기가 끝날 때마다 다시 쓴다
+store.onsync = () => {
+  const el = document.getElementById('syncstat');
+  if (el) el.textContent = store.status || `서버에 저장된 기록 ${store.rows.length}건${store.outbox.length ? `, 보내는 중 ${store.outbox.length}건` : ''}`;
+};
+
 function home() {
   clearInterval(timer);
   clearInterval(sw);
@@ -138,7 +144,7 @@ function home() {
     <p><label for="code">동기화 코드</label> <input id="code" size="28" autocomplete="off" autocapitalize="off" spellcheck="false"> <button id="usecode">이 코드 쓰기</button></p>
     <p id="syncstat" role="status"></p>`;
   document.getElementById('code').value = store.code;
-  document.getElementById('syncstat').textContent = store.status || `서버에 저장된 기록 ${store.rows.length}건${store.outbox.length ? `, 보내는 중 ${store.outbox.length}건` : ''}`;
+  store.onsync();
   document.getElementById('usecode').onclick = async () => {
     const c = document.getElementById('code').value.trim();
     if (c.length < 16) return alert('동기화 코드는 16자 이상이어야 합니다.');

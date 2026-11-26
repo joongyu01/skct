@@ -48,7 +48,7 @@ const store = {
   },
   headers() { return { apikey: API_KEY, 'x-skct-code': this.code, 'Content-Type': 'application/json' }; },
   // 보낼 것을 보내고 새 기록을 받아 온다. 겹쳐 불려도 차례로 실행된다
-  sync() { return this._chain = (this._chain || Promise.resolve()).then(() => this._sync()).catch(() => { this.status = '서버에 연결하지 못했습니다. 기록은 이 기기에 두었다가 다시 보냅니다.'; }); },
+  sync() { return this._chain = (this._chain || Promise.resolve()).then(() => this._sync()).catch(() => { this.status = '서버에 연결하지 못했습니다. 기록은 이 기기에 두었다가 다시 보냅니다.'; }).then(() => this.onsync?.()); }, // onsync: 화면의 저장 상태 문구를 고친다
   async _sync() {
     if (this.outbox.length) {
       const batch = this.outbox.slice(0, 500);
