@@ -496,6 +496,13 @@ const compare = () => {
     answer: vals.indexOf(big ? s[0] : s[4]), explain: ex.map(e => `${e[0]} = ${won(e[1])}`).join(' / ') };
 };
 const blank = () => {
+  if (R(0, 3) === 0) { // 소수 빈칸(17 − □ × 4.4 = 1.6 꼴). 전임직 대비 영상에 나온 형태. 값은 10배 한 정수로 다룬다
+    let x10, b10;
+    do { x10 = R(11, 95); b10 = R(12, 68); } while ((x10 * b10) % 10);
+    const r10 = R(5, 40), a10 = x10 * b10 / 10 + r10, d = v => String(v / 10);
+    const q = `${d(a10)} − □ × ${d(b10)} = ${d(r10)}`;
+    return numQ('창의수리', `□에 알맞은 수는?<p><b>${q}</b></p>`, x10, q.replace('□', d(x10)), { fmt: d, step: 5 });
+  }
   const x = R(6, 48), b = R(3, 19), c = R(10, 90), t = R(0, 2);
   const q = t === 0 ? `□ × ${b} − ${c} = ${x * b - c}` : t === 1 ? `□ × ${b} + ${c} = ${x * b + c}` : `(□ + ${c}) × ${b} = ${(x + c) * b}`;
   return numQ('창의수리', `□에 알맞은 수는?<p><b>${q}</b></p>`, x, q.replace('□', x), {});
