@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="ko">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>접속 기록</title>
+<style>
+  html { background: #fff; -webkit-text-size-adjust: 100%; }
+  body { font: 16px/1.5 system-ui, sans-serif; max-width: 1100px; margin: 0 auto; padding: 12px; background: #fff; color: #111; }
+  input, button { font: inherit; padding: 8px 12px; }
+  table { border-collapse: collapse; display: block; overflow-x: auto; max-width: 100%; margin: 8px 0; }
+  th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; white-space: nowrap; }
+  td.ua { white-space: normal; min-width: 240px; font-size: .85em; color: #555; }
+  .me { background: #eef6ff; }
+</style>
+<h1>접속 기록</h1>
+<p><a href="./">연습 사이트로</a></p>
+<div id="out">불러오는 중…</div>
+<script>
+// 관리자 코드를 아는 사람만 읽을 수 있다(서버 RLS). 한 번 넣으면 이 기기에 기억한다
+const URL_ = 'https://jgkgacuzpoxkjuxcrjxc.supabase.co/rest/v1/skct_visits?select=ts,visitor,page,dev,ua,ref,ip&order=id.desc&limit=1000';
+const KEY = 'sb_publishable_dk1WP0IeCX01Vw9z89nmzQ_qPqG99PI';
+const out = document.getElementById('out');
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); // 누구나 쓸 수 있는 값이라 반드시 글자로
+const kst = t => new Date(t).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+const get = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const me = get('skct-visitor');
+
+function ask(msg) {
+  out.innerHTML = `<p>${msg}</p><form><input id="code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="관리자 코드"> <button>보기</button></form>`;
+  out.querySelector('form').onsubmit = e => { e.preventDefault(); try { localStorage.setItem('skct-admin', document.getElementById('code').value.trim()); } catch {} load(); };
+}
+
+async function load() {
+  const code = get('skct-admin');
+  if (!code) return ask('관리자 코드를 넣으세요. 이 기기에 기억해 두므로 한 번만 넣으면 됩니다.');
+  out.textContent = '불러오는 중…';
+  let rows;
+  try {
+    const r = await fetch(URL_, { headers: { apikey: KEY, 'x-skct-admin': code } });
+    if (!r.ok) throw new Error(r.status);
+    rows = await r.json();
+  } catch { out.textContent = '서버에 연결하지 못했습니다. 새로고침해 보세요.'; return; }
+  // 코드가 틀리면 서버는 오류 대신 빈 목록을 준다
+  if (!rows.length) return ask('기록이 없거나 관리자 코드가 틀렸습니다. 코드를 다시 넣어 보세요.');
+
+  const by = new Map(); // 방문자(브라우저)별 요약
+  for (const x of rows) {
+    const v = by.get(x.visitor) || { n: 0, last: x.ts, first: x.ts, dev: x.dev, ip: new Set() };
+    v.n++; v.first = x.ts; if (x.ip) v.ip.add(x.ip);
+    by.set(x.visitor, v);
+  }
+  const who = v => esc(v.slice(0, 6)) + (v === me ? ' (이 기기)' : '');
+  out.innerHTML = `<p>최근 ${rows.length}건, 서로 다른 브라우저 ${by.size}개. 같은 번호는 같은 브라우저입니다. 브라우저 데이터를 지우면 새 번호가 생깁니다.</p>
+    <h2>방문자별</h2><table><tr><th>번호</th><th>기기</th><th>IP</th><th>접속 수</th><th>처음</th><th>마지막</th></tr>
+    ${[...by].map(([v, s]) => `<tr class="${v === me ? 'me' : ''}"><td>${who(v)}</td><td>${esc(s.dev)}</td><td>${esc([...s.ip].join(', '))}</td><td>${s.n}</td><td>${kst(s.first)}</td><td>${kst(s.last)}</td></tr>`).join('')}</table>
+    <h2>접속 순서</h2><table><tr><th>시각</th><th>번호</th><th>페이지</th><th>기기</th><th>IP</th><th>들어온 곳</th><th>브라우저 정보</th></tr>
+    ${rows.map(x => `<tr class="${x.visitor === me ? 'me' : ''}"><td>${kst(x.ts)}</td><td>${who(x.visitor)}</td><td>${esc(x.page)}</td><td>${esc(x.dev)}</td><td>${esc(x.ip)}</td><td>${esc(x.ref)}</td><td class="ua">${esc(x.ua)}</td></tr>`).join('')}</table>
+    <p><button id="forget">관리자 코드 잊기</button></p>`;
+  document.getElementById('forget').onclick = () => { try { localStorage.removeItem('skct-admin'); } catch {} load(); };
+}
+load();
+</script>
+</html>

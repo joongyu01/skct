@@ -5,17 +5,18 @@
 <title>SKCT 연습</title>
 <style>
   body { font: 18px/1.6 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; background: #fff; color: #111; }
-  html { background: #fff; }
+  html { background: #fff; -webkit-text-size-adjust: 100%; } /* 아이폰을 가로로 돌려도 글자가 커지지 않게 */
   button { font: inherit; padding: 10px 16px; margin: 4px 4px 4px 0; cursor: pointer; touch-action: manipulation; }
   fieldset { margin: 16px 0; border: 1px solid #ccc; border-radius: 8px; min-width: 0; }
   label { display: block; padding: 10px 0; cursor: pointer; touch-action: manipulation; } /* 손가락으로 누르기 쉬운 높이 */
   input[type=radio] { width: 1.2em; height: 1.2em; vertical-align: text-bottom; }
   table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; max-width: 100%; } /* 좁은 화면(스플릿 뷰)에서 표만 가로 스크롤 */
   th, td { border: 1px solid #999; padding: 4px 10px; text-align: center; }
-  #bar { position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 2px solid #333; display: flex; justify-content: space-between; }
+  #bar { position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 2px solid #333; display: flex; flex-wrap: wrap; gap: 0 12px; justify-content: space-between; }
+  #bar > * { white-space: nowrap; } /* 좁으면 낱말 중간이 아니라 항목 단위로 줄을 바꾼다 */
   .ok { color: #0a7a2f; } .no { color: #c22; }
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
-  #tools { position: fixed; right: 8px; top: 64px; width: 250px; display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
+  #tools { position: fixed; right: 8px; top: 64px; width: 236px; /* 아이패드 12.9 가로(1366px)에서 본문과 겹치지 않는 폭 */ display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
   #tools[hidden] { display: none; }
   #sw { font-variant-numeric: tabular-nums; }
   #pad { width: 100%; border: 1px solid #ccc; background: #fff; cursor: crosshair; touch-action: none; }
@@ -24,6 +25,13 @@
   #keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
   #keys button { margin: 0; padding: 8px 0; }
   @media (max-width: 1340px) { #tools { position: static; width: auto; margin-top: 16px; } } /* 옆 공간이 없으면 문제 아래로 */
+  @media (max-width: 600px) { /* 아이폰 세로: 여백과 표 글자를 줄여 자료해석 표가 화면 폭에 들어오게 */
+    body { font-size: 17px; padding: 10px 12px; }
+    #bar { font-size: 15px; }
+    fieldset { margin: 10px 0; padding: 6px 10px; }
+    table { font-size: 15px; }
+    th, td { padding: 3px 6px; }
+  }
 </style>
 <main id="app"></main>
 <!-- 실전 프로그램에도 화면 안 계산기와 그림판이 있다(종이·펜은 금지). 문제마다 비운다 -->
@@ -36,6 +44,7 @@
 <script src="questions.js"></script>
 <script src="bank-data.js"></script>
 <script src="store.js"></script>
+<script src="visit.js"></script>
 <script>
 const app = document.getElementById('app');
 const NUM = '①②③④⑤';
@@ -133,30 +142,30 @@ function home() {
   clearInterval(sw);
   document.onkeydown = null;
   tools(false);
+  scrollTo(0, 0);
+  const w = store.wrong();
   app.innerHTML = `<h1>SKCT 연습 (전임직)</h1>
     <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다. 문제를 풀 때 화면에 계산기와 그림판이 나옵니다. 실전처럼 종이와 펜 없이 푸세요.</p>
     <p><a href="guide.html">시험 가이드 보기</a> (당일 규칙, 영역별 공략, 심층검사 응답 요령)</p>
     <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 문제마다 초시계가 돌고, 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>실전처럼 한 문제씩 나오고, 넘긴 문제로는 되돌아갈 수 없습니다. 시간이 끝나면 자동 종료됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a} (${CONF[a][0]}문항 ${CONF[a][1] / 60}분)</button>`).join('')}
     <h2>3. 실전 모의고사</h2><p>4개 영역을 이어서 봅니다(${TOTAL}문항 ${TOTAL_MIN}분). 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
-    <h2>4. 내 기록</h2><p>세 모드에서 푼 문제가 모두 집계됩니다. 화면에 뜬 문제 중 답하지 않은 문제와 "찍음"으로 표시한 문제는 틀린 것으로 세고, 시간이 끝나 뜨지 못한 문제는 세지 않습니다. 한 번 푼 문제는 기억해 두고 다시 내지 않습니다. 자동 출제 유형은 숫자와 내용이 바뀐 새 문제가 나옵니다.</p>${statsHtml()}<button id="reset">기록 지우기</button>
-    <h2>5. 기록 저장</h2><p>기록은 서버에 저장됩니다. 다른 기기에서 이어서 하려면 아래 동기화 코드를 그 기기의 같은 칸에 넣고 "이 코드 쓰기"를 누르세요. 이 코드를 아는 사람은 기록을 보고 지울 수 있으니 남에게 알려 주지 마세요.</p>
-    <p><label for="code">동기화 코드</label> <input id="code" size="28" autocomplete="off" autocapitalize="off" spellcheck="false"> <button id="usecode">이 코드 쓰기</button></p>
-    <p id="syncstat" role="status"></p>`;
-  document.getElementById('code').value = store.code;
+    <h2>4. 오답 모음</h2><p>마지막으로 풀었을 때 틀린 문제가 모입니다("모르겠음", "찍음", 시간 안에 답하지 못한 문제 포함). 다시 풀어 맞히면 빠집니다.</p>
+    ${w.length ? `<p>${AREAS.map(a => [a, w.filter(q => q.area === a).length]).filter(x => x[1]).map(([a, n]) => `${a} ${n}`).join(' · ')}</p><button id="redo">다시 풀기 (${w.length}문제)</button><button id="wlist">목록 보기</button>` : '<p>아직 오답이 없습니다.</p>'}
+    <h2>5. 내 기록</h2><p>네 모드에서 푼 문제가 모두 집계됩니다. 화면에 뜬 문제 중 답하지 않은 문제와 "찍음"으로 표시한 문제는 틀린 것으로 세고, 시간이 끝나 뜨지 못한 문제는 세지 않습니다. 한 번 푼 문제는 기억해 두고 다시 내지 않습니다. 자동 출제 유형은 숫자와 내용이 바뀐 새 문제가 나옵니다.
+    기록은 서버에 자동으로 저장되어 아이패드, 아이폰, PC 어디서 열어도 이어집니다.</p>${statsHtml()}<p id="syncstat" role="status"></p><button id="reset">기록 지우기</button>`;
   store.onsync();
-  document.getElementById('usecode').onclick = async () => {
-    const c = document.getElementById('code').value.trim();
-    if (c.length < 16) return alert('동기화 코드는 16자 이상이어야 합니다.');
-    if (c !== store.code && confirm('이 기기의 기록을 그 코드의 기록으로 바꿀까요? 지금 코드의 기록은 서버에 그대로 남습니다.')) { await store.useCode(c); home(); }
-  };
+  if (w.length) {
+    document.getElementById('redo').onclick = () => drill(w);
+    document.getElementById('wlist').onclick = () => wrongList(w);
+  }
   document.getElementById('reset').onclick = async () => {
     if (!confirm('기록을 모두 지울까요? 서버에 저장된 기록도 지워지고 되돌릴 수 없습니다.')) return;
     try { await store.wipe(); localStorage.removeItem(KEY); } catch { alert('서버에 연결하지 못해 지우지 못했습니다.'); }
     home();
   };
   app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => start(b.dataset.a));
-  document.getElementById('drill').onclick = drill;
+  document.getElementById('drill').onclick = () => drill(); // 클릭 이벤트가 오답 목록 자리로 들어가지 않게
   document.getElementById('mock').onclick = mock;
 }
 
@@ -233,7 +242,20 @@ function mock() {
   step(0);
 }
 
-function drill() {
+// 오답 목록: 문제와 보기를 보여 주고 정답·해설은 접어 둔다(먼저 풀어 보고 펼치게)
+function wrongList(w) {
+  app.innerHTML = `<h1>오답 목록 (${w.length})</h1>` + w.map((q, k) => `<fieldset><legend>${k + 1}. ${q.area} · ${esc(q.type)}</legend><div>${q.q}</div>` +
+    `<p>${q.choices.map((c, j) => `${NUM[j]} ${c}`).join('<br>')}</p><details><summary>정답·해설 보기</summary><p>${ansHtml(q)}</p></details></fieldset>`).join('') +
+    `<button id="redo">다시 풀기</button><button id="home">처음으로</button>`;
+  document.getElementById('redo').onclick = () => drill(w);
+  document.getElementById('home').onclick = home;
+  scrollTo(0, 0);
+}
+
+// list가 있으면 오답 다시 풀기: 그 문제들을 차례로 낸다
+function drill(list) {
+  list &&= [...list];
+  const total = list?.length;
   const one = area => {
     const gens = GEN[area] || [], pool = QUESTIONS.filter(q => q.area === area);
     const unseen = pool.some(q => !store.seen.has(keyOf(q)));
@@ -246,12 +268,20 @@ function drill() {
   onpagehide = flush;
   const next = () => {
     flush();
+    if (list && !list.length) {
+      document.onkeydown = null;
+      tools(false);
+      app.innerHTML = `<h1>오답 다시 풀기: ${right} / ${n}</h1><p>맞힌 문제는 오답 모음에서 빠졌습니다. 틀린 문제와 "찍어서 맞힘"으로 표시한 문제는 남습니다.</p><button id="home">처음으로</button>`;
+      document.getElementById('home').onclick = home;
+      return scrollTo(0, 0);
+    }
     let q;
-    for (let i = 0; i < 6 && (!q || typeOf(q) === last); i++) q = one(pick(AREAS)); // 같은 유형이 연달아 나오지 않게
+    if (list) q = list.shift();
+    else for (let i = 0; i < 6 && (!q || typeOf(q) === last); i++) q = one(pick(AREAS)); // 같은 유형이 연달아 나오지 않게
     last = typeOf(q);
     const limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
     let answered = false;
-    app.innerHTML = `<div id="bar"><b>${q.area}</b><span id="sw"></span><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
+    app.innerHTML = `<div id="bar"><b>${list ? `오답 ${total - list.length}/${total} ` : ''}${q.area}</b><span id="sw"></span><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
     const stop = stopwatch(q.area);
     document.getElementById('home').onclick = () => { flush(); home(); };
     document.getElementById('idk').onclick = () => answer(-1);
