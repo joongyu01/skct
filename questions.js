@@ -667,3 +667,17 @@ GEN['언어표현'].push(() => {
   return choiceQ('언어표현', `ㄱ과 ㄴ의 빈칸에 공통으로 들어갈 말로 가장 알맞은 것은?<p>ㄱ. ${g}<br>ㄴ. ${n}</p>`, a, w, `ㄱ. ${g.replace('(　)', a)} ㄴ. ${n.replace('(　)', a)}`);
 });
 TYPES['언어표현'].push('공통 빈칸');
+
+// 경우의 수·확률 응용: 최단경로와 "적어도"(여사건). 유튜브 풀이 영상에서 SKCT 빈출이라고 한 형태
+const comb = (n, r) => { let v = 1; for (let i = 0; i < r; i++) v = v * (n - i) / (i + 1); return Math.round(v); };
+GEN['창의수리'].push(() => {
+  if (pick([true, false])) {
+    const m = R(2, 5), n = R(2, 4), v = comb(m + n, n);
+    return Object.assign(numQ('창의수리', `가로 ${m}칸, 세로 ${n}칸인 바둑판 모양의 길이 있다. 왼쪽 아래 꼭짓점에서 오른쪽 위 꼭짓점까지 최단 거리로 가는 방법은 몇 가지인가?`, v,
+      `(${m} + ${n})! ÷ (${m}! × ${n}!) = ${v}.`, { fmt: x => x + '가지', wrongs: [m * n, (m + 1) * (n + 1), comb(m + n, n) * 2], step: pick([1, 2, 5]) }), { type: '최단경로' });
+  }
+  const a = R(3, 6), b = R(2, 4), den = comb(a + b, 2), num = den - comb(a, 2), fr = v => `${v / gcd(v, den)}/${den / gcd(v, den)}`;
+  return Object.assign(numQ('창의수리', `남자 ${a}명과 여자 ${b}명 중에서 대표 2명을 뽑을 때, 여자가 적어도 1명 뽑힐 확률은?`, num,
+    `1 − (남자만 뽑힐 확률) = 1 − ${comb(a, 2)}/${den} = ${fr(num)}.`, { fmt: fr, max: den, wrongs: [comb(a, 2), a * b, comb(b, 2)] }), { type: '여사건 확률' });
+});
+TYPES['창의수리'].push('경우의 수 응용');
