@@ -35,6 +35,7 @@
 </aside>
 <script src="questions.js"></script>
 <script src="bank-data.js"></script>
+<script src="store.js"></script>
 <script>
 const app = document.getElementById('app');
 const NUM = '①②③④⑤';
@@ -62,24 +63,16 @@ const qHtml = (q, i, guessBox) => `<fieldset><legend>문제 ${i + 1}</legend><di
   (guessBox ? `<label class="guess"><input type="checkbox" name="g${i}"> 찍음</label>` : '') + `</fieldset>`;
 const ansHtml = q => `정답: ${NUM[q.answer]} ${q.choices[q.answer]}<br>해설: ${q.explain}`;
 
-// 통계: 이 기기 브라우저(localStorage)에만 저장. { "영역|유형": {r 맞힌 수, n 푼 수, s 걸린 초 합, k 시간 잰 횟수} }
+// 통계: 서버 기록(store.js)에, 서버 저장을 붙이기 전 이 기기에만 쌓였던 예전 집계(skct-stats)를 더해 보여 준다
 const KEY = 'skct-stats';
-const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch { return {}; } };
-function record(q, ok, sec) {
-  const s = load(), v = s[q.area + '|' + typeOf(q)] ||= { r: 0, n: 0, s: 0, k: 0 };
-  v.n++; if (ok) v.r++;
-  if (sec != null) { v.s += sec; v.k++; }
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {} // 사생활 보호 모드 등에서 저장이 막혀도 풀이는 계속
-}
-// 찍어서 맞힌 문제를 통계에서 틀린 것으로 되돌린다
-function demote(q) {
-  const s = load(), v = s[q.area + '|' + typeOf(q)];
-  if (v && v.r > 0) v.r--;
-  try { localStorage.setItem(KEY, JSON.stringify(s)); } catch {}
+function allStats() {
+  const out = store.stats();
+  for (const [k, v] of Object.entries(ls.get(KEY, {}))) { const o = out[k] ||= { r: 0, n: 0, s: 0, k: 0 }; for (const f of 'rnsk') o[f] += +v[f] || 0; }
+  return out;
 }
 function statsHtml() {
   // 예전(기술사무직 구성) 기록의 언어추리·수열추리는 지금 시험에 없으므로 숨긴다
-  const rows = Object.entries(load()).map(([k, v]) => [...k.split('|'), v]).filter(x => AREAS.includes(x[0]));
+  const rows = Object.entries(allStats()).map(([k, v]) => [...k.split('|'), v]).filter(x => AREAS.includes(x[0]));
   if (!rows.length) return '<p>아직 기록이 없습니다.</p>';
   const pct = (r, n) => Math.round(r / n * 100) + '%';
   const areas = AREAS.map(a => { const vs = rows.filter(x => x[0] === a).map(x => x[2]); return [a, sum(vs.map(v => v.r)), sum(vs.map(v => v.n))]; }).filter(x => x[2]);
@@ -87,7 +80,7 @@ function statsHtml() {
     '<p>유형별(정답률 낮은 순). 평균 시간은 문제마다 잰 초시계 값이고, 실전 문항당 시간을 넘으면 빨갛게 표시됩니다.</p>' +
     T(['영역', '유형', '정답률', '맞힘 / 푼 수', '평균 시간 / 목표'], rows.sort((x, y) => x[2].r / x[2].n - y[2].r / y[2].n)
       .map(([a, t, v]) => { const lim = CONF[a][1] / CONF[a][0], avg = v.k ? v.s / v.k : 0;
-        return [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? `<span class="${avg > lim ? 'no' : ''}">${avg.toFixed(1)}초</span> / ${lim}초` : '-']; }));
+        return [a, esc(t), pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? `<span class="${avg > lim ? 'no' : ''}">${avg.toFixed(1)}초</span> / ${lim}초` : '-']; }));
 }
 
 // 실전 프로그램의 계산기처럼: 괄호 없음, 사칙연산과 루트만, 누르는 순서대로 계산(2 + 3 × 4 = 20)
@@ -140,8 +133,22 @@ function home() {
     <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 문제마다 초시계가 돌고, 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>실전처럼 한 문제씩 나오고, 넘긴 문제로는 되돌아갈 수 없습니다. 시간이 끝나면 자동 종료됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a} (${CONF[a][0]}문항 ${CONF[a][1] / 60}분)</button>`).join('')}
     <h2>3. 실전 모의고사</h2><p>4개 영역을 이어서 봅니다(${TOTAL}문항 ${TOTAL_MIN}분). 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
-    <h2>4. 내 기록</h2><p>세 모드에서 푼 문제가 모두 집계됩니다. 안 푼 문제와 "찍음"으로 표시한 문제는 틀린 것으로 셉니다. 기록은 이 기기에만 저장됩니다.</p>${statsHtml()}<button id="reset">기록 지우기</button>`;
-  document.getElementById('reset').onclick = () => { if (confirm('기록을 모두 지울까요? 되돌릴 수 없습니다.')) { localStorage.removeItem(KEY); home(); } };
+    <h2>4. 내 기록</h2><p>세 모드에서 푼 문제가 모두 집계됩니다. 화면에 뜬 문제 중 답하지 않은 문제와 "찍음"으로 표시한 문제는 틀린 것으로 세고, 시간이 끝나 뜨지 못한 문제는 세지 않습니다. 한 번 푼 문제는 기억해 두고 다시 내지 않습니다. 자동 출제 유형은 숫자와 내용이 바뀐 새 문제가 나옵니다.</p>${statsHtml()}<button id="reset">기록 지우기</button>
+    <h2>5. 기록 저장</h2><p>기록은 서버에 저장됩니다. 다른 기기에서 이어서 하려면 아래 동기화 코드를 그 기기의 같은 칸에 넣고 "이 코드 쓰기"를 누르세요. 이 코드를 아는 사람은 기록을 보고 지울 수 있으니 남에게 알려 주지 마세요.</p>
+    <p><label for="code">동기화 코드</label> <input id="code" size="28" autocomplete="off" autocapitalize="off" spellcheck="false"> <button id="usecode">이 코드 쓰기</button></p>
+    <p id="syncstat" role="status"></p>`;
+  document.getElementById('code').value = store.code;
+  document.getElementById('syncstat').textContent = store.status || `서버에 저장된 기록 ${store.rows.length}건${store.outbox.length ? `, 보내는 중 ${store.outbox.length}건` : ''}`;
+  document.getElementById('usecode').onclick = async () => {
+    const c = document.getElementById('code').value.trim();
+    if (c.length < 16) return alert('동기화 코드는 16자 이상이어야 합니다.');
+    if (c !== store.code && confirm('이 기기의 기록을 그 코드의 기록으로 바꿀까요? 지금 코드의 기록은 서버에 그대로 남습니다.')) { await store.useCode(c); home(); }
+  };
+  document.getElementById('reset').onclick = async () => {
+    if (!confirm('기록을 모두 지울까요? 서버에 저장된 기록도 지워지고 되돌릴 수 없습니다.')) return;
+    try { await store.wipe(); localStorage.removeItem(KEY); } catch { alert('서버에 연결하지 못해 지우지 못했습니다.'); }
+    home();
+  };
   app.querySelectorAll('[data-a]').forEach(b => b.onclick = () => start(b.dataset.a));
   document.getElementById('drill').onclick = drill;
   document.getElementById('mock').onclick = mock;
@@ -150,13 +157,11 @@ function home() {
 // 출제기가 있는 영역은 고정 문제를 절반까지 쓰고 나머지를 자동 출제로 채운다. 없는 영역(언어이해)은 고정 문제만
 function build(area) {
   const gens = GEN[area] || [], count = CONF[area][0];
-  const qs = shuffle(QUESTIONS.filter(q => q.area === area)).slice(0, gens.length ? Math.floor(count / 2) : count);
-  const id = q => q.q + '|' + q.choices[q.answer]; // 문장과 정답이 같으면 같은 문제로 본다
-  const seen = new Set(qs.map(id));
-  for (let guard = 0; gens.length && qs.length < count && guard < 500; guard++) {
-    const q = gen(area);
-    if (!seen.has(id(q))) { seen.add(id(q)); qs.push(q); }
-  }
+  const pool = QUESTIONS.filter(q => q.area === area), unseen = pool.filter(q => !store.seen.has(keyOf(q))).length;
+  // 안 푼 고정 문제를 절반까지 쓰고 나머지는 자동 출제로 채운다. 출제기가 없는 영역(언어이해)은 고정 문제만 쓰며, 다 풀었으면 오래전에 푼 것부터 다시 낸다
+  const qs = pickNewStatic(pool, gens.length ? Math.min(Math.floor(count / 2), unseen) : count);
+  const taken = new Set(qs.map(keyOf)); // 한 세트 안에서 같은 문제가 겹치지 않게
+  while (gens.length && qs.length < count) { const q = pickNew(() => gen(area), taken); taken.add(keyOf(q)); qs.push(q); }
   qs.forEach(q => console.assert(new Set(q.choices).size === 5 && q.answer >= 0 && q.answer < 5, '문제 형식 오류', q));
   return shuffle(qs);
 }
@@ -195,10 +200,12 @@ function start(area, done, title = area) {
     const body = qs.map((q, k) => {
       const m = mine[k] ?? null, ok = m === q.answer;
       if (ok) score++;
-      record(q, ok && !guessed[k], secs[k]); // 찍은 문제는 점수는 그대로 두고 통계에서만 틀린 것으로 센다. 화면에 안 뜬 문제는 시간 기록이 없다
+      // 화면에 뜬 문제만 기록한다. 찍은 문제는 점수는 그대로 두고 기록에서만 틀린 것으로 센다
+      if (secs[k] != null) store.log(q, ok && !guessed[k], secs[k], done ? 'mock' : 'set');
       return `<fieldset><legend class="${ok ? 'ok' : 'no'}">문제 ${k + 1} ${ok ? '정답' : '오답'}${guessed[k] ? ' (찍음)' : ''}${secs[k] != null ? ` · ${secs[k]}초` : ''}</legend><div>${q.q}</div>` +
         `<p>내 답: ${m === null ? '안 풂' : NUM[m] + ' ' + q.choices[m]}<br>${ansHtml(q)}</p></fieldset>`;
     }).join('');
+    store.sync();
     scrollTo(0, 0);
     if (done) return done(score, body);
     app.innerHTML = `<h1>${area}: ${score} / ${qs.length}</h1>${body}<button id="home">처음으로</button>`;
@@ -221,20 +228,26 @@ function mock() {
 }
 
 function drill() {
-  const fixed = {}; // 영역별 고정 문제 대기열: 다 쓸 때까지 같은 지문이 다시 안 나오게
   const one = area => {
-    const gens = GEN[area] || [];
-    if (gens.length && Math.random() < 0.5) return gen(area); // 고정 문제와 자동 출제를 반반
-    if (!fixed[area]?.length) fixed[area] = shuffle(QUESTIONS.filter(q => q.area === area));
-    return fixed[area].pop() || gen(area); // 고정 문제가 없는 영역은 출제기로
+    const gens = GEN[area] || [], pool = QUESTIONS.filter(q => q.area === area);
+    const unseen = pool.some(q => !store.seen.has(keyOf(q)));
+    if (gens.length && (Math.random() < 0.5 || !unseen)) return pickNew(() => gen(area)); // 고정 문제와 자동 출제를 반반. 고정 문제를 다 풀었으면 자동 출제만
+    return pickNewStatic(pool, 1)[0];
   };
-  let n = 0, right = 0;
+  let n = 0, right = 0, last, pending;
+  // 답한 문제는 다음으로 넘어갈 때 기록한다("찍어서 맞힘"으로 고칠 틈을 주려고)
+  const flush = () => { if (pending) { store.log(pending.q, pending.ok, pending.sec, 'drill'); store.sync(); pending = null; } };
+  onpagehide = flush;
   const next = () => {
-    const q = one(pick(AREAS)), limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
+    flush();
+    let q;
+    for (let i = 0; i < 6 && (!q || typeOf(q) === last); i++) q = one(pick(AREAS)); // 같은 유형이 연달아 나오지 않게
+    last = typeOf(q);
+    const limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
     let answered = false;
     app.innerHTML = `<div id="bar"><b>${q.area}</b><span id="sw"></span><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
     const stop = stopwatch(q.area);
-    document.getElementById('home').onclick = home;
+    document.getElementById('home').onclick = () => { flush(); home(); };
     document.getElementById('idk').onclick = () => answer(-1);
     const inputs = [...app.querySelectorAll('input')];
     const answer = j => {
@@ -242,12 +255,12 @@ function drill() {
       answered = true;
       const sec = stop(), ok = j === q.answer;
       n++; if (ok) right++;
-      record(q, ok, sec);
+      pending = { q, ok, sec };
       inputs.forEach(el => el.disabled = true);
       if (j >= 0) inputs[j].checked = true;
       document.getElementById('fb').innerHTML = `<p><b class="${ok ? 'ok' : 'no'}">${ok ? '정답' : j < 0 ? '모르겠음' : '오답'}</b> · ${sec}초 걸림${sec > limit ? ` (실전 기준 ${limit}초 초과)` : ''}<br>${ansHtml(q)}</p><button id="next">다음 문제</button>${ok ? '<button id="guess">찍어서 맞힘</button>' : ''}`;
       if (ok) document.getElementById('guess').onclick = e => {
-        demote(q); right--;
+        pending.ok = false; right--;
         document.getElementById('score').textContent = `맞힌 수 ${right} / ${n}`;
         e.target.replaceWith('찍음으로 기록했습니다.');
         b.focus();
@@ -266,5 +279,6 @@ function drill() {
 }
 
 home();
+store.sync().then(() => { if (document.getElementById('syncstat')) home(); }); // 서버 기록을 받아 온 뒤, 아직 첫 화면이면 다시 그린다
 </script>
 </html>
