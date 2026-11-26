@@ -681,3 +681,150 @@ GEN['창의수리'].push(() => {
     `1 − (남자만 뽑힐 확률) = 1 − ${comb(a, 2)}/${den} = ${fr(num)}.`, { fmt: fr, max: den, wrongs: [comb(a, 2), a * b, comb(b, 2)] }), { type: '여사건 확률' });
 });
 TYPES['창의수리'].push('경우의 수 응용');
+
+// ═════════ 추가 유형: 방정식 활용(과부족, 바퀴 수, 연속하는 수, 비례배분, 부등식, 만남·추월, 농도 변형), 수열, 숫자 규칙 ═════════
+const overshort = () => {
+  let n, a, b, r, s;
+  do { n = R(5, 15); a = R(3, 7); b = a + R(1, 3); r = R(1, 9); s = (b - a) * n - r; } while (s <= 0 || s > 20);
+  const candy = a * n + r, askN = pick([true, false]);
+  return numQ('창의수리', `학생들에게 사탕을 ${a}개씩 나누어 주면 ${r}개가 남고, ${b}개씩 나누어 주면 ${s}개가 모자란다. ${askN ? '학생은 모두 몇 명인가?' : '사탕은 모두 몇 개인가?'}`,
+    askN ? n : candy, `학생 수를 x라 하면 ${a}x + ${r} = ${b}x − ${s} → x = ${n}, 사탕은 ${candy}개.`,
+    { fmt: v => v + (askN ? '명' : '개'), wrongs: askN ? [] : [b * n + s, a * n, b * n] });
+};
+const wheels = () => {
+  const n = R(8, 20), c = R(2, n - 2), w = 2 * (n - c) + 4 * c;
+  return numQ('창의수리', `주차장에 오토바이와 자동차가 합쳐 ${n}대 있고 바퀴 수의 합은 ${w}개이다. 자동차는 몇 대인가? (오토바이는 바퀴 2개, 자동차는 4개)`, c,
+    `2(${n} − x) + 4x = ${w} → x = ${c}.`, { fmt: v => v + '대', max: n, wrongs: [n - c] });
+};
+const consecutive = () => {
+  const m = R(8, 60), k = pick([3, 5]), big = pick([true, false]), h = (k - 1) / 2;
+  return numQ('창의수리', `연속하는 ${k}개의 자연수의 합이 ${k * m}일 때, 가장 ${big ? '큰' : '작은'} 수는?`, big ? m + h : m - h,
+    `가운데 수는 ${k * m} ÷ ${k} = ${m}.`, { wrongs: [m, big ? m - h : m + h] });
+};
+const share = () => {
+  let m, n;
+  do { m = R(1, 5); n = R(1, 5); } while (m === n || gcd(m, n) !== 1);
+  const unit = R(2, 12) * 1000, total = (m + n) * unit;
+  return numQ('창의수리', `${won(total)}원을 A와 B가 ${m} : ${n}의 비로 나누어 가질 때, A가 받는 금액은?`, m * unit,
+    `${won(total)} × ${m}/${m + n} = ${won(m * unit)}원.`, { fmt: v => won(v) + '원', step: unit / 2, wrongs: [n * unit, total / 2] });
+};
+const budget = () => {
+  const p = R(3, 9) * 100, box = R(1, 5) * 500, x = R(5, 20), B = p * x + box + R(0, p / 100 - 1) * 100;
+  return numQ('창의수리', `한 개에 ${p}원인 과자를 ${won(box)}원짜리 상자에 담아 사려고 한다. 전체 금액이 ${won(B)}원을 넘지 않으려면 과자를 최대 몇 개까지 살 수 있는가?`, x,
+    `${p}x + ${won(box)} ≤ ${won(B)} → x ≤ ${((B - box) / p).toFixed(1)}이므로 ${x}개.`, { fmt: v => v + '개', wrongs: [x + 1, Math.floor(B / p)] });
+};
+const meet = () => {
+  if (pick([true, false])) {
+    const a = R(4, 9) * 10, b = R(4, 9) * 10, t = R(3, 15), L = (a + b) * t;
+    return numQ('창의수리', `둘레가 ${won(L)}m인 호수를 A는 분속 ${a}m, B는 분속 ${b}m로 같은 지점에서 서로 반대 방향으로 동시에 출발했다. 두 사람이 처음 만나는 것은 출발한 지 몇 분 후인가?`, t,
+      `${won(L)} ÷ (${a} + ${b}) = ${t}분.`, { fmt: v => v + '분 후' });
+  }
+  let a, b, t0, t;
+  do { a = R(3, 6) * 10; b = a + R(1, 4) * 10; t0 = R(2, 12); t = a * t0 / (b - a); } while (t % 1 || t > 60);
+  return numQ('창의수리', `동생이 분속 ${a}m로 집을 나선 지 ${t0}분 뒤에 형이 분속 ${b}m로 같은 길을 따라갔다. 형은 출발한 지 몇 분 후에 동생을 따라잡는가?`, t,
+    `동생이 앞선 거리 ${a * t0}m ÷ 속력 차 ${b - a}m = ${t}분.`, { fmt: v => v + '분 후', wrongs: [t + t0] });
+};
+const dilute = () => {
+  const t = R(0, 2);
+  let a, b, x, w;
+  if (t === 0) { // 물을 넣어 묽게
+    do { a = R(6, 20); b = R(3, a - 1); x = R(1, 6) * 100; w = x * (a - b) / b; } while (w % 10 || w > 900);
+    return numQ('창의수리', `농도 ${a}%의 소금물 ${x}g에 물을 넣어 농도 ${b}%의 소금물을 만들려고 한다. 넣어야 하는 물의 양은?`, w,
+      `소금 ${a * x / 100}g은 그대로이므로 전체가 ${x + w}g이 되어야 한다. ${x + w} − ${x} = ${w}g.`, { fmt: v => v + 'g', step: pick([10, 20, 50]) });
+  }
+  if (t === 1) { // 물을 증발시켜 진하게
+    do { a = R(3, 15); b = R(a + 1, 25); x = R(2, 8) * 100; w = x * (b - a) / b; } while (w % 10);
+    return numQ('창의수리', `농도 ${a}%의 소금물 ${x}g에서 물을 증발시켜 농도 ${b}%의 소금물을 만들려고 한다. 증발시켜야 하는 물의 양은?`, w,
+      `소금 ${a * x / 100}g은 그대로이므로 전체가 ${x - w}g이 되어야 한다. ${x} − ${x - w} = ${w}g.`, { fmt: v => v + 'g', step: 10, max: x }); // step이 크면 0~x 사이 보기가 모자란다
+  }
+  do { a = R(3, 15); b = R(a + 2, 30); x = R(1, 6) * 100; w = x * (b - a) / (100 - b); } while (w % 5); // 소금을 더 넣어 진하게
+  return numQ('창의수리', `농도 ${a}%의 소금물 ${x}g에 소금을 더 넣어 농도 ${b}%의 소금물을 만들려고 한다. 더 넣어야 하는 소금의 양은?`, w,
+    `(${a * x / 100} + s) ÷ (${x} + s) = ${b}/100 → s = ${w}g.`, { fmt: v => v + 'g', step: pick([5, 10]) });
+};
+const sequence = () => {
+  const n = 7, t = R(0, 7);
+  let s, rule;
+  const grow = f => { while (s.length < n) s.push(f(s.at(-1), s.length)); };
+  if (t === 0) { const d = pick([1, -1]) * R(3, 12); s = [R(1, 30)]; grow(v => v + d); rule = `${sg(d)}씩 변한다`; }
+  else if (t === 1) { const r = pick([2, 3, -2]); s = [R(1, 4)]; grow(v => v * r); rule = `×${r < 0 ? `(${r})` : r}`; }
+  else if (t === 2) { let d = R(1, 5); const dd = R(1, 4); s = [R(1, 10)]; grow(v => { const x = v + d; d += dd; return x; }); rule = `더하는 수가 ${dd}씩 커진다`; }
+  else if (t === 3) { let d = R(1, 3); const r = pick([2, 3]); s = [R(1, 10)]; grow(v => { const x = v + d; d *= r; return x; }); rule = `더하는 수가 ${r}배씩 커진다`; }
+  else if (t === 4) { s = [R(1, 6), R(1, 6)]; grow(() => s.at(-1) + s.at(-2)); rule = '앞의 두 수의 합'; }
+  else if (t === 5) { const a = R(3, 9), b = R(1, a - 1); s = [R(1, 20)]; grow((v, i) => i % 2 ? v + a : v - b); rule = `+${a}, −${b} 반복`; }
+  else if (t === 6) { const r = pick([2, 3]), c = R(1, 3); s = [R(1, 4)]; grow((v, i) => i % 2 ? v * r : v + c); rule = `×${r}, +${c} 반복`; }
+  else { const a = R(1, 10), d1 = R(2, 6), b = R(20, 40), d2 = -R(1, 5); s = []; grow((_, i) => i % 2 ? b + d2 * (i - 1) / 2 : a + d1 * i / 2); rule = `홀수 번째는 ${sg(d1)}씩, 짝수 번째는 ${sg(d2)}씩 변한다`; }
+  const k = R(4, n - 1);
+  return numQ('창의수리', `일정한 규칙으로 나열된 수이다. 빈칸에 알맞은 수는?<p><b>${s.map((v, i) => i === k ? '(　)' : v).join(', ')}</b></p>`, s[k], `${rule}. 전체: ${s.join(', ')}`, { neg: true });
+};
+// 숫자 규칙: 세 줄의 예시로 규칙을 찾아 넷째 줄에 적용한다. 예시가 다른 규칙과도 맞아떨어지는 경우는 버린다
+const RULES = [
+  ['네 수의 합', (a, b, c, d) => a + b + c + d],
+  ['앞 두 수의 곱 + 뒤 두 수의 합', (a, b, c, d) => a * b + c + d],
+  ['앞 두 수의 곱 − 뒤 두 수의 곱', (a, b, c, d) => a * b - c * d],
+  ['(앞 두 수의 합) × (뒤 두 수의 합)', (a, b, c, d) => (a + b) * (c + d)],
+  ['바깥 두 수의 곱 + 안쪽 두 수의 곱', (a, b, c, d) => a * d + b * c],
+  ['(앞 두 수의 합) × 셋째 수 − 넷째 수', (a, b, c, d) => (a + b) * c - d],
+  ['앞 두 수의 곱 + 뒤 두 수의 곱', (a, b, c, d) => a * b + c * d],
+];
+const pattern = () => {
+  for (;;) {
+    const k = R(0, RULES.length - 1), f = RULES[k][1], rows = [0, 0, 0, 0].map(() => [R(2, 9), R(2, 9), R(1, 9), R(1, 9)]), vals = rows.map(r => f(...r));
+    if (vals.some(v => v <= 0)) continue;
+    if (RULES.some(([, g], j) => j !== k && rows.slice(0, 3).every(r => g(...r) === f(...r)) && g(...rows[3]) !== vals[3])) continue;
+    return numQ('창의수리', `각 줄의 네 수와 화살표 뒤의 수 사이에는 같은 규칙이 있다. 물음표에 알맞은 수는?<p>${rows.map((r, i) => `[ ${r.join(', ')} ] → ${i < 3 ? vals[i] : '( ? )'}`).join('<br>')}</p>`,
+      vals[3], `규칙: ${RULES[k][0]}.`, { wrongs: shuffle(RULES.map(([, g]) => g(...rows[3]))) });
+  }
+};
+// 후기에 사칙연산과 방정식이 많았다고 해서 연산 세 가지를 한 번 더 넣어 비중을 유지한다
+GEN['창의수리'].push(overshort, wheels, consecutive, share, budget, meet, dilute, sequence, pattern, calc, compare, blank);
+TYPES['창의수리'].push('과부족', '바퀴 수', '연속하는 수', '비례배분', '부등식', '만남·추월', '농도(물·소금)', '수열', '숫자 규칙', '연산(계산)', '연산(비교)', '연산(빈칸)');
+
+// ═════════ 자료해석 추가 유형 ═════════
+// 자료이해형: 표를 보고 보기 다섯 개의 참·거짓을 가린다. 경계에 걸리는 보기는 만들지 않는다
+const readTable = () => {
+  const ys = [2021, 2022, 2023, 2024], names = shuffle(['A', 'B', 'C', 'D', 'E']).slice(0, 4).sort();
+  const [unit, label] = pick([['공장', '생산량(천 개)'], ['지점', '매출액(억 원)'], ['제품', '판매량(백 대)'], ['지역', '방문객(만 명)']]);
+  let v;
+  do { v = Object.fromEntries(names.map(n => [n, ys.map(() => R(20, 95) * 10)])); } while (new Set(names.flatMap(n => v[n])).size < 16);
+  // 각 함수는 [보기 문장, 참 여부, 근거]를 돌려주고, 경계에 걸리면 null을 돌려준다
+  const makers = [
+    () => { const n = pick(names), i = R(1, 3), up = pick([true, false]); return [`${ys[i]}년 ${n}의 값은 전년보다 ${up ? '증가' : '감소'}했다.`, (v[n][i] > v[n][i - 1]) === up, `${n}: ${ys[i - 1]}년 ${v[n][i - 1]} → ${ys[i]}년 ${v[n][i]}`]; },
+    () => { const n = pick(names); return [`${n}의 값은 매년 증가했다.`, v[n].every((x, i) => !i || x > v[n][i - 1]), `${n}: ${v[n].join(' → ')}`]; },
+    () => { const i = R(0, 3), n = pick(names), top = names.reduce((a, b) => v[a][i] > v[b][i] ? a : b); return [`${ys[i]}년에 값이 가장 큰 ${unit}은 ${n}이다.`, top === n, `${ys[i]}년 최댓값은 ${top}의 ${v[top][i]}`]; },
+    () => { const i = R(0, 3), [n, m] = shuffle(names), k = pick([1.5, 2, 3]), r = v[n][i] / v[m][i]; return Math.abs(r - k) < 0.08 * k ? null : [`${ys[i]}년 ${n}의 값은 ${m}의 ${k}배 이상이다.`, r >= k, `${v[n][i]} ÷ ${v[m][i]} ≈ ${r.toFixed(2)}배`]; },
+    () => { const n = pick(names), s = sum(v[n]), N = Math.round((s + pick([-1, 1]) * R(6, 30) * 10) / 100) * 100; return Math.abs(N - s) < 40 ? null : [`${n}의 4년간 합계는 ${won(N)} 이상이다.`, s >= N, `${n}의 합계 ${won(s)}`]; },
+    () => { const i = R(0, 3), s = sum(names.map(n => v[n][i])), N = s + pick([0, 0, 1, -1]) * R(1, 5) * 10; return [`${ys[i]}년 네 ${unit}의 합계는 ${won(N)}이다.`, N === s, `${ys[i]}년 합계 ${won(s)}`]; },
+    () => { const n = pick(names), i = R(1, 3), p = pick([10, 20, 25, 50]), rate = (v[n][i] - v[n][i - 1]) / v[n][i - 1] * 100; return Math.abs(rate - p) < 3 ? null : [`${ys[i]}년 ${n}의 전년 대비 증가율은 ${p}% 이상이다.`, rate >= p, `(${v[n][i]} − ${v[n][i - 1]}) ÷ ${v[n][i - 1]} ≈ ${rate.toFixed(1)}%`]; },
+    () => { const i = R(0, 3), [n, m] = shuffle(names), d = Math.abs(v[n][i] - v[m][i]), N = d + pick([0, 0, 1, -1]) * R(1, 4) * 10; return N <= 0 ? null : [`${ys[i]}년 ${n}와 ${m}의 차이는 ${N}이다.`, N === d, `${ys[i]}년 ${n}와 ${m}의 차이 ${d}`]; },
+  ];
+  const want = pick([true, false]), pool = [], seen = new Set(); // want가 true면 "옳은 것", false면 "옳지 않은 것"
+  for (let g = 0; g < 300 && pool.length < 40; g++) { const s = pick(makers)(); if (s && !seen.has(s[0])) { seen.add(s[0]); pool.push(s); } }
+  const odd = pool.find(s => s[1] === want), rest = pool.filter(s => s[1] !== want).slice(0, 4);
+  if (!odd || rest.length < 4) return readTable();
+  const choices = shuffle([odd, ...rest]);
+  return { area: '자료해석', q: `<p><b>${unit}별 ${label}</b></p>` + T([unit, ...ys.map(y => y + '년')], names.map(n => [n, ...v[n]])) + `자료에 대한 설명으로 ${want ? '옳은' : '옳지 <u>않은</u>'} 것은?`,
+    choices: choices.map(s => s[0]), answer: choices.indexOf(odd), explain: `${odd[2]}.` };
+};
+const range = () => {
+  const cols = ['1월', '2월', '3월', '4월', '5월', '6월'], label = pick(['불량품 수(개)', '전력 사용량(MWh)', '출하량(톤)', '방문객 수(명)']);
+  let v;
+  do { v = cols.map(() => R(12, 98) * 10); } while (new Set(v).size < 6);
+  const mx = Math.max(...v), mn = Math.min(...v);
+  return numQ('자료해석', T(['월', ...cols], [[label, ...v]]) + '값이 가장 큰 달과 가장 작은 달의 차이는?', mx - mn, `${mx} − ${mn} = ${mx - mn}.`, { step: 10, wrongs: [mx + mn] });
+};
+const missing = () => {
+  const rows = ['가', '나', '다', '라'], v = rows.map(() => R(12, 95) * 10), k = R(0, 3), total = sum(v);
+  return numQ('자료해석', T(['구분', ...rows, '합계'], [['인원(명)', ...v.map((x, i) => i === k ? '( A )' : x), won(total)]]) + '( A )에 들어갈 값은?', v[k],
+    `${won(total)} − (${v.filter((_, i) => i !== k).join(' + ')}) = ${v[k]}.`, { step: 10 });
+};
+const jump = () => {
+  const ys = [2020, 2021, 2022, 2023, 2024];
+  let v, d, s;
+  do { v = ys.map(() => R(20, 95) * 10); d = v.slice(1).map((x, i) => x - v[i]); s = [...d].sort((a, b) => b - a); } while (s[0] <= 0 || s[0] === s[1]);
+  const i = d.indexOf(s[0]);
+  return numQ('자료해석', T(['연도', ...ys], [['생산량(톤)', ...v]]) + '전년 대비 증가량이 가장 큰 해의 증가량은?', s[0],
+    `${ys[i + 1]}년: ${v[i + 1]} − ${v[i]} = ${s[0]}.`, { step: 10, wrongs: d.filter(x => x > 0) });
+};
+// 후기와 강의 모두 자료해석은 일치·불일치(자료이해)가 대부분이라고 해서 두 번 넣는다
+GEN['자료해석'].push(readTable, readTable, range, missing, jump);
+TYPES['자료해석'].push('자료이해', '자료이해', '최대·최소 차', '빈칸 값', '증가량');

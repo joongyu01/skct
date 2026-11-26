@@ -17,6 +17,7 @@
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
   #tools { position: fixed; right: 8px; top: 64px; width: 250px; display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
   #tools[hidden] { display: none; }
+  #sw { font-variant-numeric: tabular-nums; }
   #pad { width: 100%; border: 1px solid #ccc; background: #fff; cursor: crosshair; touch-action: none; }
   #erase { padding: 2px 10px; margin: 0 0 0 6px; font-size: .8em; }
   #res { display: block; text-align: right; border: 1px solid #ccc; padding: 6px; min-height: 1.6em; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -40,7 +41,20 @@ const NUM = '①②③④⑤';
 const CONF = { '언어표현': [30, 180], '언어이해': [20, 420], '창의수리': [30, 900], '자료해석': [20, 600] };
 const AREAS = Object.keys(CONF);
 const TOTAL = sum(AREAS.map(a => CONF[a][0])), TOTAL_MIN = sum(AREAS.map(a => CONF[a][1])) / 60;
-let timer;
+let timer, sw;
+
+// 문제별 초시계: 문제가 화면에 뜬 순간부터 0.1초 단위로 센다. 실전 문항당 시간을 넘기면 빨갛게 바뀐다.
+// 돌려주는 함수를 부르면 멈추고 걸린 초를 알려 준다
+function stopwatch(area) {
+  clearInterval(sw);
+  const t0 = Date.now(), limit = CONF[area][1] / CONF[area][0], el = document.getElementById('sw');
+  const draw = () => { const s = (Date.now() - t0) / 1000; el.textContent = `이 문제 ${s.toFixed(1)}초 / 목표 ${limit}초`; el.className = s > limit ? 'no' : ''; };
+  draw();
+  sw = setInterval(draw, 100);
+  return () => { clearInterval(sw); return Math.round((Date.now() - t0) / 100) / 10; };
+}
+// 문제 은행(bank-data.js): 사람이 쓰고 두 번씩 풀어 검증한 고정 문제
+if (typeof BANK !== 'undefined') QUESTIONS.push(...BANK);
 
 const qHtml = (q, i, guessBox) => `<fieldset><legend>문제 ${i + 1}</legend><div>${q.q}</div>` +
   q.choices.map((c, j) => `<label><input type="radio" name="q${i}" value="${j}"> ${NUM[j]} ${c}</label>`).join('') +
@@ -69,9 +83,10 @@ function statsHtml() {
   const pct = (r, n) => Math.round(r / n * 100) + '%';
   const areas = AREAS.map(a => { const vs = rows.filter(x => x[0] === a).map(x => x[2]); return [a, sum(vs.map(v => v.r)), sum(vs.map(v => v.n))]; }).filter(x => x[2]);
   return T(['영역', '정답률', '맞힘 / 푼 수'], areas.map(([a, r, n]) => [a, pct(r, n), `${r} / ${n}`])) +
-    '<p>유형별(정답률 낮은 순). 평균 시간은 익숙해지기에서 잰 값입니다.</p>' +
-    T(['영역', '유형', '정답률', '맞힘 / 푼 수', '평균 시간'], rows.sort((x, y) => x[2].r / x[2].n - y[2].r / y[2].n)
-      .map(([a, t, v]) => [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? Math.round(v.s / v.k) + '초' : '-']));
+    '<p>유형별(정답률 낮은 순). 평균 시간은 문제마다 잰 초시계 값이고, 실전 문항당 시간을 넘으면 빨갛게 표시됩니다.</p>' +
+    T(['영역', '유형', '정답률', '맞힘 / 푼 수', '평균 시간 / 목표'], rows.sort((x, y) => x[2].r / x[2].n - y[2].r / y[2].n)
+      .map(([a, t, v]) => { const lim = CONF[a][1] / CONF[a][0], avg = v.k ? v.s / v.k : 0;
+        return [a, t, pct(v.r, v.n), `${v.r} / ${v.n}`, v.k ? `<span class="${avg > lim ? 'no' : ''}">${avg.toFixed(1)}초</span> / ${lim}초` : '-']; }));
 }
 
 // 실전 프로그램의 계산기처럼: 괄호 없음, 사칙연산과 루트만, 누르는 순서대로 계산(2 + 3 × 4 = 20)
@@ -115,12 +130,13 @@ function tools(on) {
 
 function home() {
   clearInterval(timer);
+  clearInterval(sw);
   document.onkeydown = null;
   tools(false);
   app.innerHTML = `<h1>SKCT 연습 (전임직)</h1>
     <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다. 문제를 풀 때 화면에 계산기와 그림판이 나옵니다. 실전처럼 종이와 펜 없이 푸세요.</p>
     <p><a href="guide.html">시험 가이드 보기</a> (당일 규칙, 영역별 공략, 심층검사 응답 요령)</p>
-    <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
+    <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 문제마다 초시계가 돌고, 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>실전처럼 한 문제씩 나오고, 넘긴 문제로는 되돌아갈 수 없습니다. 시간이 끝나면 자동 종료됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a} (${CONF[a][0]}문항 ${CONF[a][1] / 60}분)</button>`).join('')}
     <h2>3. 실전 모의고사</h2><p>4개 영역을 이어서 봅니다(${TOTAL}문항 ${TOTAL_MIN}분). 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
     <h2>4. 내 기록</h2><p>세 모드에서 푼 문제가 모두 집계됩니다. 안 푼 문제와 "찍음"으로 표시한 문제는 틀린 것으로 셉니다. 기록은 이 기기에만 저장됩니다.</p>${statsHtml()}<button id="reset">기록 지우기</button>`;
@@ -130,10 +146,10 @@ function home() {
   document.getElementById('mock').onclick = mock;
 }
 
-// 출제기가 있는 영역은 고정 문제 최대 2개 + 자동 출제, 없는 영역(언어이해)은 고정 문제만
+// 출제기가 있는 영역은 고정 문제를 절반까지 쓰고 나머지를 자동 출제로 채운다. 없는 영역(언어이해)은 고정 문제만
 function build(area) {
   const gens = GEN[area] || [], count = CONF[area][0];
-  const qs = shuffle(QUESTIONS.filter(q => q.area === area)).slice(0, gens.length ? 2 : count);
+  const qs = shuffle(QUESTIONS.filter(q => q.area === area)).slice(0, gens.length ? Math.floor(count / 2) : count);
   const seen = new Set(qs.map(q => q.q));
   for (let guard = 0; gens.length && qs.length < count && guard < 500; guard++) {
     const q = gen(area);
@@ -146,13 +162,14 @@ function build(area) {
 // 실전 규칙대로 한 문제씩 보여 주고 이전 문항으로는 못 돌아간다.
 // done이 있으면(모의고사) 채점 결과를 화면에 띄우지 않고 done(점수, 해설HTML)으로 넘긴다
 function start(area, done, title = area) {
-  const qs = build(area), mine = [], guessed = [];
+  const qs = build(area), mine = [], guessed = [], secs = [];
   const end = Date.now() + CONF[area][1] * 1000; // 마감 시각 기준: 탭이 백그라운드로 가서 타이머가 멈춰도 시간이 맞게
-  let i = 0;
+  let i = 0, stop;
   const save = () => {
     const fd = new FormData(app.querySelector('form')), v = fd.get('q' + i);
     mine[i] = v === null ? null : +v;
     guessed[i] = fd.has('g' + i);
+    secs[i] = stop();
   };
   const tick = () => {
     const left = Math.max(0, Math.round((end - Date.now()) / 1000));
@@ -161,9 +178,10 @@ function start(area, done, title = area) {
   };
   const show = () => {
     const last = i === qs.length - 1;
-    app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
+    app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span id="sw"></span><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
       `<button>${last ? (done ? '영역 종료하고 다음으로' : '종료') : '다음 문제 (되돌아갈 수 없음)'}</button></form>`;
     app.querySelector('form').onsubmit = e => { e.preventDefault(); save(); if (++i < qs.length) show(); else grade(); };
+    stop = stopwatch(area);
     tools(true);
     tick();
     scrollTo(0, 0);
@@ -175,8 +193,8 @@ function start(area, done, title = area) {
     const body = qs.map((q, k) => {
       const m = mine[k] ?? null, ok = m === q.answer;
       if (ok) score++;
-      record(q, ok && !guessed[k]); // 찍은 문제는 점수는 그대로 두고 통계에서만 틀린 것으로 센다
-      return `<fieldset><legend class="${ok ? 'ok' : 'no'}">문제 ${k + 1} ${ok ? '정답' : '오답'}${guessed[k] ? ' (찍음)' : ''}</legend><div>${q.q}</div>` +
+      record(q, ok && !guessed[k], secs[k]); // 찍은 문제는 점수는 그대로 두고 통계에서만 틀린 것으로 센다. 화면에 안 뜬 문제는 시간 기록이 없다
+      return `<fieldset><legend class="${ok ? 'ok' : 'no'}">문제 ${k + 1} ${ok ? '정답' : '오답'}${guessed[k] ? ' (찍음)' : ''}${secs[k] != null ? ` · ${secs[k]}초` : ''}</legend><div>${q.q}</div>` +
         `<p>내 답: ${m === null ? '안 풂' : NUM[m] + ' ' + q.choices[m]}<br>${ansHtml(q)}</p></fieldset>`;
     }).join('');
     scrollTo(0, 0);
@@ -204,22 +222,23 @@ function drill() {
   const fixed = {}; // 영역별 고정 문제 대기열: 다 쓸 때까지 같은 지문이 다시 안 나오게
   const one = area => {
     const gens = GEN[area] || [];
-    if (gens.length && Math.random() < 0.9) return gen(area);
+    if (gens.length && Math.random() < 0.5) return gen(area); // 고정 문제와 자동 출제를 반반
     if (!fixed[area]?.length) fixed[area] = shuffle(QUESTIONS.filter(q => q.area === area));
     return fixed[area].pop() || gen(area); // 고정 문제가 없는 영역은 출제기로
   };
   let n = 0, right = 0;
   const next = () => {
-    const q = one(pick(AREAS)), t0 = Date.now(), limit = Math.round(CONF[q.area][1] / CONF[q.area][0]); // 실전 문항당 시간
+    const q = one(pick(AREAS)), limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
     let answered = false;
-    app.innerHTML = `<div id="bar"><b>${q.area}</b><span>맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
+    app.innerHTML = `<div id="bar"><b>${q.area}</b><span id="sw"></span><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
+    const stop = stopwatch(q.area);
     document.getElementById('home').onclick = home;
     document.getElementById('idk').onclick = () => answer(-1);
     const inputs = [...app.querySelectorAll('input')];
     const answer = j => {
       if (answered) return;
       answered = true;
-      const sec = Math.round((Date.now() - t0) / 1000), ok = j === q.answer;
+      const sec = stop(), ok = j === q.answer;
       n++; if (ok) right++;
       record(q, ok, sec);
       inputs.forEach(el => el.disabled = true);
@@ -227,7 +246,7 @@ function drill() {
       document.getElementById('fb').innerHTML = `<p><b class="${ok ? 'ok' : 'no'}">${ok ? '정답' : j < 0 ? '모르겠음' : '오답'}</b> · ${sec}초 걸림${sec > limit ? ` (실전 기준 ${limit}초 초과)` : ''}<br>${ansHtml(q)}</p><button id="next">다음 문제</button>${ok ? '<button id="guess">찍어서 맞힘</button>' : ''}`;
       if (ok) document.getElementById('guess').onclick = e => {
         demote(q); right--;
-        app.querySelector('#bar span').textContent = `맞힌 수 ${right} / ${n}`;
+        document.getElementById('score').textContent = `맞힌 수 ${right} / ${n}`;
         e.target.replaceWith('찍음으로 기록했습니다.');
         b.focus();
       };
