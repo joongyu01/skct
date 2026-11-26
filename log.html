@@ -25,14 +25,23 @@ const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '
 const kst = t => new Date(t).toLocaleString('ko-KR', { timeZone: 'Asia/Seoul', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const get = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const me = get('skct-visitor');
+let mem = null; // 저장소가 막힌 브라우저(사파리 '모든 쿠키 차단' 등)에서도 이번 화면 동안은 코드를 쓴다
 
 function ask(msg) {
   out.innerHTML = `<p>${msg}</p><form><input id="code" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="관리자 코드"> <button>보기</button></form>`;
-  out.querySelector('form').onsubmit = e => { e.preventDefault(); try { localStorage.setItem('skct-admin', document.getElementById('code').value.trim()); } catch {} load(); };
+  out.querySelector('form').onsubmit = e => {
+    e.preventDefault();
+    const v = document.getElementById('code').value.trim();
+    // 한글 입력 상태로 치면 헤더에 넣을 수 없는 글자가 되어 요청 자체가 안 나간다
+    if (!/^[\x21-\x7e]+$/.test(v)) return ask('코드는 영문과 숫자로 넣으세요. 한/영 키가 한글로 되어 있지 않은지 확인하세요.');
+    mem = v;
+    try { localStorage.setItem('skct-admin', v); } catch {}
+    load();
+  };
 }
 
 async function load() {
-  const code = get('skct-admin');
+  const code = get('skct-admin') || mem;
   if (!code) return ask('관리자 코드를 넣으세요. 이 기기에 기억해 두므로 한 번만 넣으면 됩니다.');
   out.textContent = '불러오는 중…';
   let rows;
@@ -40,7 +49,7 @@ async function load() {
     const r = await fetch(URL_, { headers: { apikey: KEY, 'x-skct-admin': code } });
     if (!r.ok) throw new Error(r.status);
     rows = await r.json();
-  } catch { out.textContent = '서버에 연결하지 못했습니다. 새로고침해 보세요.'; return; }
+  } catch { return ask('서버에 연결하지 못했습니다. 잠시 뒤 코드를 다시 넣어 보세요.'); }
   // 코드가 틀리면 서버는 오류 대신 빈 목록을 준다
   if (!rows.length) return ask('기록이 없거나 관리자 코드가 틀렸습니다. 코드를 다시 넣어 보세요.');
 
@@ -51,13 +60,13 @@ async function load() {
     by.set(x.visitor, v);
   }
   const who = v => esc(v.slice(0, 6)) + (v === me ? ' (이 기기)' : '');
-  out.innerHTML = `<p>최근 ${rows.length}건, 서로 다른 브라우저 ${by.size}개. 같은 번호는 같은 브라우저입니다. 브라우저 데이터를 지우면 새 번호가 생깁니다.</p>
+  out.innerHTML = `<p>최근 ${rows.length}건, 서로 다른 브라우저 ${by.size}개. 같은 번호는 같은 브라우저입니다. 브라우저 데이터를 지우면 새 번호가 생기고, 아이폰·아이패드 사파리는 7일 넘게 안 들어오면 저절로 새 번호가 생길 수 있으니 기기 칸(모델·화면 크기)과 IP를 같이 보세요.</p>
     <h2>방문자별</h2><table><tr><th>번호</th><th>기기</th><th>IP</th><th>접속 수</th><th>처음</th><th>마지막</th></tr>
     ${[...by].map(([v, s]) => `<tr class="${v === me ? 'me' : ''}"><td>${who(v)}</td><td>${esc(s.dev)}</td><td>${esc([...s.ip].join(', '))}</td><td>${s.n}</td><td>${kst(s.first)}</td><td>${kst(s.last)}</td></tr>`).join('')}</table>
     <h2>접속 순서</h2><table><tr><th>시각</th><th>번호</th><th>페이지</th><th>기기</th><th>IP</th><th>들어온 곳</th><th>브라우저 정보</th></tr>
     ${rows.map(x => `<tr class="${x.visitor === me ? 'me' : ''}"><td>${kst(x.ts)}</td><td>${who(x.visitor)}</td><td>${esc(x.page)}</td><td>${esc(x.dev)}</td><td>${esc(x.ip)}</td><td>${esc(x.ref)}</td><td class="ua">${esc(x.ua)}</td></tr>`).join('')}</table>
     <p><button id="forget">관리자 코드 잊기</button></p>`;
-  document.getElementById('forget').onclick = () => { try { localStorage.removeItem('skct-admin'); } catch {} load(); };
+  document.getElementById('forget').onclick = () => { mem = null; try { localStorage.removeItem('skct-admin'); } catch {} load(); };
 }
 load();
 </script>

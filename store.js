@@ -35,6 +35,7 @@ function clean(html) {
 // 오답 다시 풀기용 문제 객체. 모양이 틀리면 버린다
 function revive(area, type, key, c) {
   if (!c || !AREAS.includes(area) || !Array.isArray(c.choices) || c.choices.length !== 5 || !Number.isInteger(c.answer) || c.answer < 0 || c.answer > 4) return null;
+  if (typeof (c.q ?? '') !== 'string' || typeof (c.explain ?? '') !== 'string' || !c.choices.every(x => typeof x === 'string')) return null; // 객체가 섞이면 글자로 바꾸다 예외가 나 첫 화면이 깨진다
   return { area, type: String(type), q: clean(c.q ?? ''), choices: c.choices.map(clean), answer: c.answer, explain: clean(c.explain ?? ''), _k: key };
 }
 
@@ -50,7 +51,11 @@ const store = {
   // 오답 모음: 마지막으로 풀었을 때 틀린 문제(최근 것부터). 다시 풀어 맞히면 빠진다
   wrong() {
     const last = new Map(), body = new Map();
-    for (const r of this.all()) { last.set(r[2], r); if (r[6]) body.set(r[2], r[6]); } // 기록은 시간순이라 뒤의 것이 마지막
+    for (const r of this.all()) {
+      const p = last.get(r[2]);
+      if (!p || r[5] >= p[5]) last.set(r[2], r); // 올린 순서가 아니라 푼 시각으로: 오프라인 기기가 늦게 올린 옛 풀이가 최근 풀이를 덮지 않게
+      if (r[6]) body.set(r[2], r[6]);
+    }
     return [...last.values()].filter(r => !r[3]).sort((a, b) => b[5] - a[5]).map(r => revive(r[0], r[1], r[2], body.get(r[2]))).filter(Boolean);
   },
   index() { this.seen = new Map(); for (const r of this.all()) this.seen.set(r[2], Math.max(r[5], this.seen.get(r[2]) || 0)); },
@@ -75,26 +80,41 @@ const store = {
   // 보낼 것을 보내고 새 기록을 받아 온다. 겹쳐 불려도 차례로 실행된다
   sync() { return this._chain = (this._chain || Promise.resolve()).then(() => this._sync()).catch(() => { this.status = '서버에 연결하지 못했습니다. 기록은 이 기기에 두었다가 다시 보냅니다.'; }).then(() => this.onsync?.()); }, // onsync: 화면의 저장 상태 문구를 고친다
   async _sync() {
-    if (this.outbox.length) {
-      const batch = this.outbox.slice(0, 500);
-      const r = await fetch(API, { method: 'POST', headers: { ...this.headers(), Prefer: 'return=minimal' }, body: JSON.stringify(batch.map(({ t, ...row }) => row)) });
+    // 다른 기기에서 '기록 지우기'를 했으면 마지막으로 받은 행이 서버에 없다(지우기 말고는 행이 사라지지 않는다). 그러면 처음부터 다시 받는다
+    if (this.lastId) {
+      const r = await fetch(`${API}?select=id&id=eq.${this.lastId}`, { headers: this.headers() });
+      if (!r.ok) throw new Error('확인 실패 ' + r.status);
+      if (!(await r.json()).length) { this.rows = []; this.lastId = 0; }
+    }
+    const unsent = this.outbox.filter(o => !o.sent).slice(0, 500);
+    if (unsent.length) {
+      // 모든 행의 키를 같게 맞춘다(예전 형식 기록이 섞이면 서버가 묶음 전체를 거절한다). 시각은 올린 때가 아니라 푼 때
+      const body = unsent.map(o => ({ area: o.area, type: o.type, qkey: o.qkey, ok: !!o.ok, sec: o.sec ?? null, mode: o.mode, q: o.q ?? null, ts: new Date(o.t * 1000).toISOString() }));
+      const r = await fetch(API, { method: 'POST', headers: { ...this.headers(), Prefer: 'return=minimal' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('보내기 실패 ' + r.status);
-      this.outbox = this.outbox.slice(batch.length);
+      unsent.forEach(o => o.sent = 1); // 받아 올 때까지 outbox에 둔다. 그사이 집계에서 빠지지 않게
       this.save();
     }
+    const got = [];
+    let last = this.lastId;
     for (;;) {
-      const r = await fetch(`${API}?select=id,area,type,qkey,ok,sec,ts,q&id=gt.${this.lastId}&order=id&limit=1000`, { headers: this.headers() });
+      const r = await fetch(`${API}?select=id,area,type,qkey,ok,sec,ts,q&id=gt.${last}&order=id&limit=1000`, { headers: this.headers() });
       if (!r.ok) throw new Error('받기 실패 ' + r.status);
       const rows = await r.json();
-      for (const x of rows) { this.rows.push([x.area, x.type, x.qkey, x.ok ? 1 : 0, x.sec, Math.round(Date.parse(x.ts) / 1000), x.q]); this.lastId = x.id; }
+      for (const x of rows) { got.push([x.area, x.type, x.qkey, x.ok ? 1 : 0, x.sec, Math.round(Date.parse(x.ts) / 1000), x.q]); last = x.id; }
       if (rows.length < 1000) break;
     }
+    // 받은 행 넣기와 보낸 기록 빼기를 한 번에 한다(중간에 화면이 같은 기록을 두 번 세거나 빠뜨리지 않게)
+    this.rows.push(...got);
+    this.lastId = last;
+    this.outbox = this.outbox.filter(o => !o.sent);
     this.save();
     this.index();
     this.status = '';
   },
   // 기록을 서버와 이 기기에서 모두 지운다
   async wipe() {
+    await this._chain; // 받아 오는 중에 지우면 지운 기록이 응답과 함께 되살아난다
     const r = await fetch(`${API}?id=gt.0`, { method: 'DELETE', headers: this.headers() });
     if (!r.ok) throw new Error('지우기 실패 ' + r.status);
     this.rows = []; this.lastId = 0; this.outbox = [];
