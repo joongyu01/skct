@@ -17,19 +17,20 @@
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
   #tools { position: fixed; right: 8px; top: 64px; width: 250px; display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
   #tools[hidden] { display: none; }
-  #tools textarea { font: inherit; width: 100%; box-sizing: border-box; }
+  #pad { width: 100%; border: 1px solid #ccc; background: #fff; cursor: crosshair; touch-action: none; }
+  #erase { padding: 2px 10px; margin: 0 0 0 6px; font-size: .8em; }
   #res { display: block; text-align: right; border: 1px solid #ccc; padding: 6px; min-height: 1.6em; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
   #keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; margin-top: 6px; }
   #keys button { margin: 0; padding: 8px 0; }
   @media (max-width: 1340px) { #tools { position: static; width: auto; margin-top: 16px; } } /* 옆 공간이 없으면 문제 아래로 */
 </style>
 <main id="app"></main>
-<!-- 실전 프로그램에도 화면 안 계산기와 메모장이 있다(종이·펜은 금지). 문제마다 비운다 -->
+<!-- 실전 프로그램에도 화면 안 계산기와 그림판이 있다(종이·펜은 금지). 문제마다 비운다 -->
 <aside id="tools" hidden>
   <b>계산기</b>
   <div id="calc" tabindex="0" aria-label="계산기. 클릭한 뒤 키보드로도 입력할 수 있습니다"><output id="res">0</output><div id="keys"></div></div>
-  <b>메모장</b>
-  <textarea id="memo" rows="8" aria-label="메모장"></textarea>
+  <div><b>그림판</b> <button id="erase" type="button">지우기</button></div>
+  <canvas id="pad" width="500" height="380" aria-label="그림판. 마우스로 끌어서 씁니다"></canvas>
 </aside>
 <script src="questions.js"></script>
 <script>
@@ -96,9 +97,19 @@ document.getElementById('calc').onkeydown = e => {
   const k = { '*': '×', '/': '÷', '-': '−', Enter: '=', Backspace: '←', Escape: 'C' }[e.key] || e.key;
   if (/^[\d.+=×÷−←C]$/.test(k)) { e.preventDefault(); press(k); } // preventDefault: 포커스된 버튼이 Enter로 또 눌리지 않게
 };
+// 그림판: 실전처럼 마우스로 끌어서 쓴다
+const pad = document.getElementById('pad'), ctx = pad.getContext('2d');
+ctx.lineWidth = 2;
+let drawing = false;
+const at = e => { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) * pad.width / r.width, (e.clientY - r.top) * pad.height / r.height]; };
+pad.onpointerdown = e => { drawing = true; pad.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...at(e)); };
+pad.onpointermove = e => { if (drawing) { ctx.lineTo(...at(e)); ctx.stroke(); } };
+pad.onpointerup = pad.onpointercancel = () => { drawing = false; };
+const wipe = () => ctx.clearRect(0, 0, pad.width, pad.height);
+document.getElementById('erase').onclick = wipe;
 function tools(on) {
   document.getElementById('tools').hidden = !on;
-  document.getElementById('memo').value = '';
+  wipe();
   press('C');
 }
 
@@ -107,7 +118,7 @@ function home() {
   document.onkeydown = null;
   tools(false);
   app.innerHTML = `<h1>SKCT 연습 (전임직)</h1>
-    <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다. 문제를 풀 때 화면에 계산기와 메모장이 나옵니다. 실전처럼 종이와 펜 없이 푸세요.</p>
+    <p>인지검사 4개 영역, ${TOTAL}문항 ${TOTAL_MIN}분 구성입니다. 문제를 풀 때 화면에 계산기와 그림판이 나옵니다. 실전처럼 종이와 펜 없이 푸세요.</p>
     <h2>1. 익숙해지기</h2><p>유형을 섞어 한 문제씩 풉니다. 답을 고르면 바로 정답과 해설, 걸린 시간이 나옵니다. 숫자 키 1~5로 답하고 Enter로 다음 문제. 모르면 찍지 말고 "모르겠음"(0 키)을, 찍어서 맞혔으면 "찍어서 맞힘"을 누르면 틀린 것으로 기록됩니다.</p><button id="drill">시작</button>
     <h2>2. 영역별 연습</h2><p>실전처럼 한 문제씩 나오고, 넘긴 문제로는 되돌아갈 수 없습니다. 시간이 끝나면 자동 종료됩니다.</p>${AREAS.map(a => `<button data-a="${a}">${a} (${CONF[a][0]}문항 ${CONF[a][1] / 60}분)</button>`).join('')}
     <h2>3. 실전 모의고사</h2><p>4개 영역을 이어서 봅니다(${TOTAL}문항 ${TOTAL_MIN}분). 점수와 해설은 전부 끝난 뒤에 나옵니다.</p><button id="mock">시작</button>
@@ -225,7 +236,7 @@ function drill() {
     };
     inputs.forEach((el, j) => el.onchange = () => answer(j));
     // 0 = 모르겠음. 계산기·메모장에 숫자를 칠 때는 답으로 처리하지 않는다
-    document.onkeydown = e => { if (/^[0-5]$/.test(e.key) && !e.target.closest('#tools')) answer(e.key - 1); };
+    document.onkeydown = e => { if (/^[0-5]$/.test(e.key) && !e.target.closest?.('#tools')) answer(e.key - 1); };
     tools(true);
     scrollTo(0, 0);
   };
