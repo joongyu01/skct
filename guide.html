@@ -3,6 +3,8 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKCT 시험 가이드</title>
+<!-- 로그인하지 않은 기기는 첫 화면(로그인)으로 보낸다. 가이드에는 개인 기록이 없어 화면만 가린다 -->
+<script>try { if (!JSON.parse(localStorage.getItem('skct-token'))) location.replace('./'); } catch { location.replace('./'); }</script>
 <style>
   html { background: #fff; -webkit-text-size-adjust: 100%; }
   body { font: 18px/1.7 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; background: #fff; color: #111; }

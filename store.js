@@ -1,9 +1,10 @@
 // 풀이 기록 저장소. 기록을 서버(Supabase)에 저장하고, 푼 문제를 기억해 같은 문제가 다시 나오지 않게 한다.
 // 모든 기기가 같은 코드(SHARED)를 x-skct-code 헤더로 보내 같은 기록을 쓴다(자동 동기화). 서버는 RLS로 그 코드의 기록만 읽고 쓰게 한다.
 // 서버가 안 되면 기록을 이 기기(outbox)에 두었다가 다음에 보낸다.
-const API = 'https://jgkgacuzpoxkjuxcrjxc.supabase.co/rest/v1/skct_attempts';
+const REST = 'https://jgkgacuzpoxkjuxcrjxc.supabase.co/rest/v1';
+const API = REST + '/skct_attempts';
 const API_KEY = 'sb_publishable_dk1WP0IeCX01Vw9z89nmzQ_qPqG99PI'; // 브라우저에 두라고 만든 공개용 키
-// shortcut: 코드가 이 파일에 공개돼 있어 사이트를 아는 사람은 누구나 이 기록을 읽고 쓰고 지울 수 있다. 다른 사람이 쓰기 시작하면 로그인으로 바꾼다
+// shortcut: 기록은 아직 이 공개 코드로만 묶여 있어(RLS) 사이트 코드를 아는 사람은 읽고 쓸 수 있다. 로그인 토큰(x-skct-token)은 보내고 있으니 RLS 정책에 토큰 확인을 넣으면 막힌다
 const SHARED = 'skct-shared-records-joongyu';
 const ls = {
   get: (k, d) => { try { return JSON.parse(localStorage.getItem(k)) ?? d; } catch { return d; } },
@@ -41,6 +42,7 @@ function revive(area, type, key, c) {
 
 const store = {
   code: SHARED,
+  token: ls.get('skct-token', ''),   // 로그인하면 서버가 준 토큰. 기기마다 한 번 로그인하면 계속 쓴다
   rows: ls.get('skct-rows', []),     // 서버에서 받은 기록: [영역, 유형, 문제 키, 맞았으면 1, 걸린 초, 푼 시각(초), 틀렸으면 문제 내용]
   lastId: ls.get('skct-last', 0),    // 여기까지 받아 왔다
   outbox: ls.get('skct-outbox', []), // 아직 서버에 못 보낸 기록
@@ -76,7 +78,25 @@ const store = {
     this.seen.set(keyOf(q), t);
     this.save();
   },
-  headers() { return { apikey: API_KEY, 'x-skct-code': this.code, 'Content-Type': 'application/json' }; },
+  headers() { return { apikey: API_KEY, 'x-skct-code': this.code, 'x-skct-token': this.token, 'Content-Type': 'application/json' }; },
+  // 로그인: 맞으면 토큰을 저장하고 null, 아니면 화면에 보일 문구를 돌려준다
+  async login(pw) {
+    const r = await fetch(REST + '/rpc/skct_login', { method: 'POST', headers: { apikey: API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ pw }) });
+    if (!r.ok) throw new Error('로그인 실패 ' + r.status);
+    const res = await r.json();
+    if (!res.token) return res.error === 'locked' ? '오늘은 비밀번호를 너무 많이 틀려서 막혔어요. 내일 다시 해 주세요.' : '비밀번호가 맞지 않아요.';
+    this.token = res.token;
+    ls.set('skct-token', this.token);
+    return null;
+  },
+  // 저장된 토큰이 아직 살아 있는지. 서버에 닿지 못하면 예외(오프라인이면 그냥 들어가게)
+  async tokenOk() {
+    if (!this.token) return false;
+    // 4초 제한: 신호가 약해 요청이 멈추면 빈 화면으로 1분씩 기다리지 않고 오프라인처럼 바로 시작한다
+    const r = await fetch(REST + '/rpc/skct_token_ok', { method: 'POST', headers: { apikey: API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ t: this.token }), signal: AbortSignal.timeout(4000) });
+    if (!r.ok) throw new Error('확인 실패 ' + r.status);
+    return (await r.json()) === true;
+  },
   // 보낼 것을 보내고 새 기록을 받아 온다. 겹쳐 불려도 차례로 실행된다
   sync() { return this._chain = (this._chain || Promise.resolve()).then(() => this._sync()).catch(() => { this.status = '서버에 연결하지 못했습니다. 기록은 이 기기에 두었다가 다시 보냅니다.'; }).then(() => this.onsync?.()); }, // onsync: 화면의 저장 상태 문구를 고친다
   async _sync() {

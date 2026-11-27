@@ -1,6 +1,6 @@
 // AI 해설: 사이트에서 문제 하나와 질문을 받아 Claude 답을 글자 그대로 흘려 보낸다. GET은 남은 크레딧을 알려 준다.
 // Claude API 키는 Supabase 함수 비밀값(ANTHROPIC_API_KEY)에만 있고 사이트 코드에는 없다.
-// 배포: verify_jwt=false (사이트는 JWT가 아닌 publishable 키를 쓴다). 대신 Origin과 하루 호출 상한으로 막는다.
+// 배포: verify_jwt=false (사이트는 JWT가 아닌 publishable 키를 쓴다). 대신 로그인 토큰(x-skct-token), Origin, 하루 호출 상한으로 막는다.
 import Anthropic from "npm:@anthropic-ai/sdk@1.14.0";
 
 const ORIGINS = ["https://www.joongyu.co.kr", "https://joongyu.co.kr", "http://127.0.0.1:8765", "http://localhost:8765"];
@@ -40,7 +40,7 @@ function errText(e: unknown) {
   return "AI 해설을 받지 못했습니다. 잠시 뒤 다시 보내 주세요.";
 }
 
-// 비밀 키로만 부를 수 있는 DB 함수(skct_ai_take, skct_ai_spend, skct_ai_status)를 부른다
+// DB 함수를 비밀 키로 부른다(skct_ai_take, skct_ai_spend, skct_ai_status는 비밀 키로만 부를 수 있다)
 async function rpc(name: string, args: object) {
   const key = JSON.parse(Deno.env.get("SUPABASE_SECRET_KEYS") ?? "{}").default ?? Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/rest/v1/rpc/${name}`, {
@@ -55,9 +55,18 @@ async function rpc(name: string, args: object) {
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin") ?? "";
   if (!ORIGINS.includes(origin)) return new Response("forbidden", { status: 403 });
-  const cors = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Headers": "content-type", "Access-Control-Allow-Methods": "GET, POST", Vary: "Origin" };
+  const cors = { "Access-Control-Allow-Origin": origin, "Access-Control-Allow-Headers": "content-type, x-skct-token", "Access-Control-Allow-Methods": "GET, POST", Vary: "Origin" };
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   const fail = (status: number, msg: string) => new Response(msg, { status, headers: { ...cors, "Content-Type": "text/plain; charset=utf-8" } });
+
+  // 사이트에 로그인한 기기만 쓴다: 로그인 때 받은 토큰을 DB에서 확인한다
+  try {
+    const token = req.headers.get("x-skct-token") ?? "";
+    if (!token || token.length > 200 || !(await rpc("skct_token_ok", { t: token }))) return fail(401, "로그인이 필요해요. 페이지를 새로 고쳐 다시 로그인해 주세요.");
+  } catch (e) {
+    console.error(e);
+    return fail(500, "로그인을 확인하지 못했어요.");
+  }
 
   // 남은 크레딧: 충전액(credit, 모르면 null) - 이 함수로 쓴 비용 합계(spent). 다른 곳에서 같은 키를 쓰면 그만큼 어긋난다
   if (req.method === "GET") {
