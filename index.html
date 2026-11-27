@@ -18,7 +18,12 @@
   .guess { color: #666; border-top: 1px dashed #ccc; margin-top: 4px; }
   #tools { position: fixed; right: 8px; top: 64px; width: 236px; /* 아이패드 12.9 가로(1366px)에서 본문과 겹치지 않는 폭 */ display: grid; gap: 6px; background: #fff; border: 1px solid #ccc; border-radius: 8px; padding: 8px; }
   #tools[hidden] { display: none; }
-  #sw, #t { font-variant-numeric: tabular-nums; }
+  #t { font-variant-numeric: tabular-nums; }
+  /* 문제별 남은 시간 원: 글자 폭이 변하지 않아 막대 줄바꿈으로 보기가 밀리지 않는다 */
+  #sw { display: inline-block; width: 1.5em; height: 1.5em; box-sizing: border-box; border: 2px solid #333; border-radius: 50%; vertical-align: middle; }
+  #bar button { margin: 0; padding: 0 10px; font-size: .9em; }
+  .paused #app > :not(#bar), .paused #tools { display: none; }
+  .paused #app::after { content: '일시 정지 중입니다. 계속하기를 누르면 이어서 풉니다.'; display: block; padding: 24px 0; }
   #pad { width: 100%; border: 1px solid #ccc; background: #fff; cursor: crosshair; touch-action: none; }
   #erase { padding: 2px 10px; margin: 0 0 0 6px; font-size: .8em; }
   #res { display: block; text-align: right; border: 1px solid #ccc; padding: 6px; min-height: 1.6em; overflow-x: auto; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -55,16 +60,31 @@ const AREAS = Object.keys(CONF);
 const TOTAL = sum(AREAS.map(a => CONF[a][0])), TOTAL_MIN = sum(AREAS.map(a => CONF[a][1])) / 60;
 let timer, sw;
 
-// 문제별 초시계: 문제가 화면에 뜬 순간부터 0.1초 단위로 센다. 실전 문항당 시간을 넘기면 빨갛게 바뀐다.
+// 일시 정지: 멈춘 동안은 시계가 가지 않는다. 문제별 초시계와 영역 마감 시각 모두 now()로 재서 함께 멈춘다
+let pausedAt = 0, pausedTotal = 0;
+const now = () => (pausedAt || Date.now()) - pausedTotal;
+function setPause(on) {
+  if (!on && pausedAt) { pausedTotal += Date.now() - pausedAt; pausedAt = 0; }
+  if (on && !pausedAt) pausedAt = Date.now();
+  document.body.classList.toggle('paused', on); // 멈춘 동안 문제와 계산기를 가린다
+  const b = document.getElementById('pause');
+  if (b) b.textContent = on ? '계속하기' : '일시 정지';
+}
+
+// 문제별 초시계: 실전 문항당 시간이 꽉 찬 원으로 시작해 줄어든다. 넘기면 빨간 원이 된다.
 // 돌려주는 함수를 부르면 멈추고 걸린 초를 알려 준다
 function stopwatch(area) {
   clearInterval(sw);
-  const t0 = Date.now(), limit = CONF[area][1] / CONF[area][0], el = document.getElementById('sw');
-  // 숫자 폭 공백(U+2007)으로 자릿수를 맞춘다. 9.9초→10.0초에서 글자가 넓어지면 막대가 두 줄로 바뀌며 보기가 밀려 엉뚱한 답이 눌린다
-  const draw = () => { const s = (Date.now() - t0) / 1000; el.textContent = `이 문제 ${s.toFixed(1).padStart(5, ' ')}초 / 목표 ${limit}초`; el.className = s > limit ? 'no' : ''; };
+  const t0 = now(), limit = CONF[area][1] / CONF[area][0], el = document.getElementById('sw');
+  document.getElementById('pause').onclick = () => setPause(!pausedAt);
+  const draw = () => {
+    const s = (now() - t0) / 1000;
+    el.style.background = s > limit ? '#c22' : `conic-gradient(#0a7a2f ${(1 - s / limit) * 360}deg, #e5e5e5 0)`;
+    el.setAttribute('aria-label', s > limit ? `목표 ${limit}초 넘음` : `이 문제 남은 시간 약 ${Math.ceil(limit - s)}초`);
+  };
   draw();
   sw = setInterval(draw, 100);
-  return () => { clearInterval(sw); return Math.round((Date.now() - t0) / 100) / 10; };
+  return () => { clearInterval(sw); return Math.round((now() - t0) / 100) / 10; };
 }
 // 문제 은행(bank-data.js): 사람이 쓰고 두 번씩 풀어 검증한 고정 문제
 if (typeof BANK !== 'undefined') QUESTIONS.push(...BANK);
@@ -142,6 +162,7 @@ store.onsync = () => {
 function home() {
   clearInterval(timer);
   clearInterval(sw);
+  setPause(false);
   document.onkeydown = null;
   tools(false);
   scrollTo(0, 0);
@@ -187,7 +208,7 @@ function build(area) {
 // done이 있으면(모의고사) 채점 결과를 화면에 띄우지 않고 done(점수, 해설HTML)으로 넘긴다
 function start(area, done, title = area) {
   const qs = build(area), mine = [], guessed = [], secs = [];
-  const end = Date.now() + CONF[area][1] * 1000; // 마감 시각 기준: 탭이 백그라운드로 가서 타이머가 멈춰도 시간이 맞게
+  const end = now() + CONF[area][1] * 1000; // 마감 시각 기준: 탭이 백그라운드로 가서 타이머가 멈춰도 시간이 맞게
   let i = 0, stop;
   const save = () => {
     const fd = new FormData(app.querySelector('form')), v = fd.get('q' + i);
@@ -196,13 +217,13 @@ function start(area, done, title = area) {
     secs[i] = stop();
   };
   const tick = () => {
-    const left = Math.max(0, Math.round((end - Date.now()) / 1000));
+    const left = Math.max(0, Math.round((end - now()) / 1000));
     document.getElementById('t').textContent = `${String(Math.floor(left / 60)).padStart(2, ' ')}:${String(left % 60).padStart(2, '0')}`;
     if (!left) { save(); grade(); }
   };
   const show = () => {
     const last = i === qs.length - 1;
-    app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span id="sw"></span><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
+    app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span>이 문제 <i id="sw" role="img"></i></span><button type="button" id="pause">일시 정지</button><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
       `<button>${last ? (done ? '영역 종료하고 다음으로' : '종료') : '다음 문제 (되돌아갈 수 없음)'}</button></form>`;
     app.querySelector('form').onsubmit = e => { e.preventDefault(); save(); if (++i < qs.length) show(); else grade(); };
     stop = stopwatch(area);
@@ -284,7 +305,7 @@ function drill(list) {
     last = typeOf(q);
     const limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
     let answered = false;
-    app.innerHTML = `<div id="bar"><b>${list ? `오답 ${total - list.length}/${total} ` : ''}${q.area}</b><span id="sw"></span><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
+    app.innerHTML = `<div id="bar"><b>${list ? `오답 ${total - list.length}/${total} ` : ''}${q.area}</b><span>이 문제 <i id="sw" role="img"></i></span><button type="button" id="pause">일시 정지</button><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
     const stop = stopwatch(q.area);
     document.getElementById('home').onclick = () => { flush(); home(); };
     document.getElementById('idk').onclick = () => answer(-1);
@@ -311,7 +332,7 @@ function drill(list) {
     };
     inputs.forEach((el, j) => el.onchange = () => answer(j));
     // 0 = 모르겠음. 계산기·메모장에 숫자를 칠 때는 답으로 처리하지 않는다
-    document.onkeydown = e => { if (/^[0-5]$/.test(e.key) && !e.target.closest?.('#tools')) answer(e.key - 1); };
+    document.onkeydown = e => { if (!pausedAt && /^[0-5]$/.test(e.key) && !e.target.closest?.('#tools')) answer(e.key - 1); };
     tools(true);
     scrollTo(0, 0);
   };
