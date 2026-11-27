@@ -225,7 +225,7 @@ function start(area, done, title = area) {
   };
   const show = () => {
     const last = i === qs.length - 1;
-    app.innerHTML = `<div id="bar"><b>${title} ${i + 1} / ${qs.length}</b><span>이 문제 <i id="sw" aria-hidden="true"></i> <span id="swt"></span></span><button type="button" id="pause">일시 정지</button><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
+    app.innerHTML = `<div id="bar"><b>${title} (${CONF[area][1] / CONF[area][0]}초) ${i + 1} / ${qs.length}</b><span>이 문제 <i id="sw" aria-hidden="true"></i> <span id="swt"></span></span><button type="button" id="pause">일시 정지</button><span id="t" role="timer"></span></div><form>${qHtml(qs[i], i, true)}` +
       `<button>${last ? (done ? '영역 종료하고 다음으로' : '종료') : '다음 문제 (되돌아갈 수 없음)'}</button></form>`;
     app.querySelector('form').onsubmit = e => { e.preventDefault(); save(); if (++i < qs.length) show(); else grade(); };
     stop = stopwatch(area);
@@ -307,7 +307,7 @@ function drill(list) {
     last = typeOf(q);
     const limit = CONF[q.area][1] / CONF[q.area][0]; // 실전 문항당 시간
     let answered = false;
-    app.innerHTML = `<div id="bar"><b>${list ? `오답 ${total - list.length}/${total} ` : ''}${q.area}</b><span>이 문제 <i id="sw" aria-hidden="true"></i> <span id="swt"></span></span><button type="button" id="pause">일시 정지</button><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
+    app.innerHTML = `<div id="bar"><b>${list ? `오답 ${total - list.length}/${total} ` : ''}${q.area} (${limit}초)</b><span>이 문제 <i id="sw" aria-hidden="true"></i> <span id="swt"></span></span><button type="button" id="pause">일시 정지</button><span id="score">맞힌 수 ${right} / ${n}</span></div>${qHtml(q, n)}<div id="fb" aria-live="polite"><button id="idk">모르겠음</button></div><button id="home">그만하기</button>`;
     const stop = stopwatch(q.area);
     document.getElementById('home').onclick = () => { flush(); home(); };
     document.getElementById('idk').onclick = () => answer(-1);
