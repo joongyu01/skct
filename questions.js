@@ -316,7 +316,7 @@ const GEN = {
       const w = R(2, 5), b = R(2, 5), n = w + b, den = n * (n - 1) / 2;
       const g = (x, y) => y ? g(y, x % y) : x, fr = v => `${v / g(v, den)}/${den / g(v, den)}`;
       return numQ('창의수리', `흰 공 ${w}개와 검은 공 ${b}개가 든 주머니에서 동시에 2개를 꺼낼 때, 두 공의 색이 서로 다를 확률은?`, w * b,
-        `(${w}×${b}) ÷ ${n}C2 = ${w * b}/${den} = ${fr(w * b)}.`, { fmt: fr, max: den, wrongs: [den - w * b] });
+        `(${w}×${b}) ÷ ${n}C2 = ${w * b}/${den}${fr(w * b) === `${w * b}/${den}` ? '' : ` = ${fr(w * b)}`}.`, { fmt: fr, max: den, wrongs: [den - w * b] });
     },
     () => {
       let c, m, d, p;
@@ -992,7 +992,8 @@ const compare = () => {
   }
   // 정답은 <, >, = 셋뿐이라 부등호 순서를 고정하면 ①②⑤만 정답이 된다. 순서를 섞어 정답 자리를 고르게 한다
   const choices = shuffle(SIGNS), right = lv < rv ? '&lt;' : lv > rv ? '&gt;' : '=';
-  return { area: '창의수리', q: `다음 수식의 대소를 비교하시오.<p><b>${l} □ ${r}</b></p>`, choices,
+  // ≤·≥는 값이 다르거나 같을 때도 참이라 정답이 여럿이 된다. 가장 알맞은 기호 하나를 고른다는 규칙을 문제에 적는다
+  return { area: '창의수리', q: `다음 수식의 □에 들어갈 가장 알맞은 기호는? (값이 다르면 &lt; 또는 &gt;, 같으면 =)<p><b>${l} □ ${r}</b></p>`, choices,
     answer: choices.indexOf(right), explain: `${note}. 값이 다르면 &lt; 또는 &gt;, 같으면 = 를 고른다.` };
 };
 const blank = () => {
@@ -1199,7 +1200,7 @@ const wheels = () => {
 const consecutive = () => {
   const m = R(8, 60), k = pick([3, 5]), big = pick([true, false]), h = (k - 1) / 2;
   return numQ('창의수리', `연속하는 ${k}개의 자연수의 합이 ${k * m}일 때, 가장 ${big ? '큰' : '작은'} 수는?`, big ? m + h : m - h,
-    `가운데 수는 ${k * m} ÷ ${k} = ${m}.`, { wrongs: [m, big ? m - h : m + h] });
+    `가운데 수는 ${k * m} ÷ ${k} = ${m}, 가장 ${big ? '큰' : '작은'} 수는 ${m} ${big ? '+' : '−'} ${h} = ${big ? m + h : m - h}.`, { wrongs: [m, big ? m - h : m + h] });
 };
 const share = () => {
   let m, n;
