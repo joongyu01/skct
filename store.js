@@ -166,7 +166,29 @@ function pickNew(make, taken) {
   }
   return best || make();
 }
+// 자동 출제는 출제기를 카드 묶음처럼 돌린다. 한 바퀴를 다 돌기 전에는 같은 출제기를 다시 쓰지 않고, 오래 안 푼 유형부터 낸다
+// (출제기를 무작위로 뽑으면 창의수리 30문제 세트에서 같은 틀이 10번쯤 겹쳤다). 연산은 출제기가 여러 개라 한 바퀴에 여러 번 나온다
+const decks = {};
+function gen(area) {
+  if (!decks[area]?.length) {
+    const last = {}; // 유형 → 마지막으로 푼 시각
+    for (const r of store.all()) if (r[0] === area) last[r[1]] = Math.max(last[r[1]] || 0, r[5]);
+    const t = i => last[TYPES[area][i]] || 0;
+    decks[area] = shuffle(GEN[area].map((_, i) => i)).sort((a, b) => t(b) - t(a)); // pop()이 끝에서 꺼내므로 오래된 유형을 끝에 둔다
+  }
+  const i = decks[area].pop(), q = genAt(area, i);
+  q.type ??= TYPES[area][i];
+  return q;
+}
 // 고정 문제: 안 푼 것을 무작위로, 다 풀었으면 오래전에 푼 순서로 n개
+// 한 유형은 문제은행 속 비율만큼만 먼저 넣는다(자료해석 고정 문제 10개 중 복합 자료가 6개씩 몰리기도 했다). 안 푼 문제가 늘 먼저다
 function pickNewStatic(pool, n, taken) {
-  return shuffle(pool).sort((a, b) => (store.seen.get(keyOf(a)) || 0) - (store.seen.get(keyOf(b)) || 0)).filter(q => !taken?.has(keyOf(q))).slice(0, n);
+  const order = shuffle(pool).sort((a, b) => (store.seen.get(keyOf(a)) || 0) - (store.seen.get(keyOf(b)) || 0)).filter(q => !taken?.has(keyOf(q)));
+  const size = {}, got = {}, rank = new Map();
+  for (const q of pool) size[typeOf(q)] = (size[typeOf(q)] || 0) + 1;
+  for (const q of order) { // 0 안 푼 문제·유형 몫 안, 1 안 푼 문제·몫 넘음, 2 푼 문제·몫 안, 3 푼 문제·몫 넘음
+    const t = typeOf(q), over = (got[t] = (got[t] || 0) + 1) > Math.ceil(n * size[t] / pool.length);
+    rank.set(q, (store.seen.has(keyOf(q)) ? 2 : 0) + over);
+  }
+  return order.sort((a, b) => rank.get(a) - rank.get(b)).slice(0, n);
 }

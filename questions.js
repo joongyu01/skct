@@ -428,7 +428,6 @@ const genAt = (area, i) => {
   finally { wantRank = null; }
   return f();
 };
-const gen = area => { const i = R(0, GEN[area].length - 1), q = genAt(area, i); q.type ??= TYPES[area][i]; return q; };
 // 문제 코드: 영역-유형 번호-문제 키 앞 5자리(예: 창의수리-07-3f9k2). 다른 Claude 세션에서 이 문제를 찾아 물어볼 때 쓴다(tools/find-question.js가 같은 규칙으로 찾는다).
 // 유형 번호는 사람이 보기 위한 것이다(TYPES 순서, 그 뒤 고정 문제에 처음 나온 순서). 유형이 늘면 번호가 밀릴 수 있어 찾을 때는 영역과 키만 쓴다
 let TYPE_NO;
