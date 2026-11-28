@@ -43,13 +43,13 @@ function revive(area, type, key, c) {
 const store = {
   code: SHARED,
   token: ls.get('skct-token', ''),   // 로그인하면 서버가 준 토큰. 기기마다 한 번 로그인하면 계속 쓴다
-  rows: ls.get('skct-rows', []),     // 서버에서 받은 기록: [영역, 유형, 문제 키, 맞았으면 1, 걸린 초, 푼 시각(초), 틀렸으면 문제 내용]
+  rows: ls.get('skct-rows', []),     // 서버에서 받은 기록: [영역, 유형, 문제 키, 맞았으면 1, 걸린 초, 푼 시각(초), 틀렸으면 문제 내용, 모드(drill·set·mock)]
   lastId: ls.get('skct-last', 0),    // 여기까지 받아 왔다
   outbox: ls.get('skct-outbox', []), // 아직 서버에 못 보낸 기록
   seen: new Map(),                   // 문제 키 → 마지막으로 푼 시각
   status: '',
   save() { ls.set('skct-code', this.code); ls.set('skct-rows', this.rows); ls.set('skct-last', this.lastId); ls.set('skct-outbox', this.outbox); },
-  all() { return [...this.rows, ...this.outbox.map(o => [o.area, o.type, o.qkey, o.ok ? 1 : 0, o.sec, o.t, o.q])]; },
+  all() { return [...this.rows, ...this.outbox.map(o => [o.area, o.type, o.qkey, o.ok ? 1 : 0, o.sec, o.t, o.q, o.mode])]; },
   // 오답 모음: 마지막으로 풀었을 때 틀린 문제(최근 것부터). 다시 풀어 맞히면 빠진다
   wrong() {
     const last = new Map(), body = new Map();
@@ -120,10 +120,10 @@ const store = {
     const got = [];
     let last = this.lastId;
     for (;;) {
-      const r = await fetch(`${API}?select=id,area,type,qkey,ok,sec,ts,q&id=gt.${last}&order=id&limit=1000`, { headers: this.headers() });
+      const r = await fetch(`${API}?select=id,area,type,qkey,ok,sec,ts,q,mode&id=gt.${last}&order=id&limit=1000`, { headers: this.headers() });
       if (!r.ok) throw new Error('받기 실패 ' + r.status);
       const rows = await r.json();
-      for (const x of rows) { got.push([x.area, x.type, x.qkey, x.ok ? 1 : 0, x.sec, Math.round(Date.parse(x.ts) / 1000), x.q]); last = x.id; }
+      for (const x of rows) { got.push([x.area, x.type, x.qkey, x.ok ? 1 : 0, x.sec, Math.round(Date.parse(x.ts) / 1000), x.q, x.mode]); last = x.id; }
       if (rows.length < 1000) break;
     }
     // 받은 행 넣기와 보낸 기록 빼기를 한 번에 한다(중간에 화면이 같은 기록을 두 번 세거나 빠뜨리지 않게)
@@ -145,6 +145,8 @@ const store = {
 };
 // 예전에는 기기마다 무작위 코드를 썼다. 그 코드로 받아 둔 기록은 버리고 공용 기록을 처음부터 받는다(서버의 예전 코드 기록은 0건이었다)
 if (ls.get('skct-code', null) !== SHARED) { store.rows = []; store.lastId = 0; }
+// 모드(8번째 칸)가 없는 예전 형식으로 받아 둔 기록은 처음부터 다시 받는다(지난 결과 화면이 모드로 회차를 묶는다)
+if (store.rows.some(r => r.length < 8)) { store.rows = []; store.lastId = 0; }
 store.save();
 store.index();
 
