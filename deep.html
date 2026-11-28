@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>심층검사 연습 · SKCT</title>
   <script>try { if (!JSON.parse(localStorage.getItem('skct-token'))) location.replace('./'); } catch { location.replace('./'); }</script>
+  <script src="theme.js?v=1"></script>
   <meta http-equiv="Content-Security-Policy" content="connect-src https://jgkgacuzpoxkjuxcrjxc.supabase.co; form-action 'none'">
   <style>
     :root { color-scheme: light; background: #fff; color: #17191c; -webkit-text-size-adjust: 100%; }
@@ -127,6 +128,24 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
   .deep-compare th, .deep-compare td { padding: 5px 7px; }
   .deep-axis-name { flex-wrap: wrap; gap: 0 8px; }
 }
+    /* 어두운 화면(오른쪽 아래 버튼, theme.js). 밝은 화면 규칙은 그대로 두고 덮어쓴다 */
+    :root[data-theme=dark] { color-scheme: dark; background: #1b1d21; color: #d9dce1; }
+    :root[data-theme=dark] a { color: #8ab4f8; }
+    :root[data-theme=dark] button:focus-visible, :root[data-theme=dark] a:focus-visible, :root[data-theme=dark] summary:focus-visible, :root[data-theme=dark] input:focus-visible + span, :root[data-theme=dark] .deep-scroll:focus-visible { outline-color: #7aa7ff; }
+    :root[data-theme=dark] .test-bar { background: #1b1d21; }
+    :root[data-theme=dark] .site-head, :root[data-theme=dark] .test-bar { border-color: #8a9099; }
+    :root[data-theme=dark] .lead p, :root[data-theme=dark] .description, :root[data-theme=dark] .note, :root[data-theme=dark] .row-num, :root[data-theme=dark] .mobile-group, :root[data-theme=dark] .deep-note, :root[data-theme=dark] .deep-metrics dt, :root[data-theme=dark] .deep-axis-name > span, :root[data-theme=dark] .deep-ends { color: #a2a8b0; }
+    body:has(#active:not([hidden])) #theme-toggle { display: none; } /* 푸는 중에는 버튼이 가깝다·멀다 칸을 가리지 않게 숨긴다 */
+    :root[data-theme=dark] .warn { color: #e3a663; }
+    :root[data-theme=dark] .mode, :root[data-theme=dark] .button, :root[data-theme=dark] .guide-note, :root[data-theme=dark] .prep, :root[data-theme=dark] .question-list, :root[data-theme=dark] .matrix-head > div + div, :root[data-theme=dark] .question-row, :root[data-theme=dark] .choice > span, :root[data-theme=dark] .rank-button, :root[data-theme=dark] .end-row, :root[data-theme=dark] .deep-metrics > div, :root[data-theme=dark] .deep-detail, :root[data-theme=dark] .deep-checks li, :root[data-theme=dark] .deep-zero, :root[data-theme=dark] .deep-compare th, :root[data-theme=dark] .deep-compare td { border-color: #4a4f57; }
+    :root[data-theme=dark] .button, :root[data-theme=dark] .choice > span, :root[data-theme=dark] .rank-button, :root[data-theme=dark] .matrix-head, :root[data-theme=dark] .deep-compare thead th, :root[data-theme=dark] .deep-compare th:first-child { background: #25282d; }
+    :root[data-theme=dark] .button:hover { background: #30343a; }
+    :root[data-theme=dark] .primary { background: #d5dae0; border-color: #d5dae0; color: #111; }
+    :root[data-theme=dark] .primary:hover { background: #b9c0c8; }
+    :root[data-theme=dark] .choice input:checked + span, :root[data-theme=dark] .rank-button[aria-pressed="true"] { background: #dfe4ea; border-color: #dfe4ea; color: #111; }
+    :root[data-theme=dark] .deep-axis-track { background: #3a3e44; }
+    :root[data-theme=dark] .deep-axis-track::before { border-color: #8a9099; }
+    :root[data-theme=dark] .deep-axis-track > span { background: #e6e9ed; border-color: #1b1d21; }
   </style>
 </head>
 <body>

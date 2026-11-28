@@ -3,6 +3,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SKCT 연습</title>
+<script src="theme.js?v=1"></script>
 <style>
   body { font: 18px/1.6 system-ui, sans-serif; max-width: 820px; margin: 0 auto; padding: 16px; background: #fff; color: #111; }
   html { background: #fff; -webkit-text-size-adjust: 100%; } /* 아이폰을 가로로 돌려도 글자가 커지지 않게 */
@@ -45,6 +46,16 @@
     table { font-size: 15px; }
     th, td { padding: 3px 6px; }
   }
+  /* 어두운 화면(오른쪽 아래 버튼, theme.js). 밝은 화면 규칙은 그대로 두고 덮어쓴다 */
+  :root[data-theme=dark] { color-scheme: dark; --track: #3a3e44; --ok: #5ccf86; --no: #ff7b72; }
+  :root[data-theme=dark], :root[data-theme=dark] body, :root[data-theme=dark] #bar, :root[data-theme=dark] #tools, :root[data-theme=dark] #pad { background: #1b1d21; }
+  :root[data-theme=dark] body { color: #d9dce1; }
+  :root[data-theme=dark] a { color: #8ab4f8; }
+  :root[data-theme=dark] fieldset, :root[data-theme=dark] th, :root[data-theme=dark] td, :root[data-theme=dark] #tools, :root[data-theme=dark] #pad, :root[data-theme=dark] #res, :root[data-theme=dark] .guess, :root[data-theme=dark] .chat { border-color: #4a4f57; }
+  :root[data-theme=dark] #bar, :root[data-theme=dark] #sw { border-color: #8a9099; }
+  body:has(#bar) #theme-toggle { display: none; } /* 시간 재는 화면에서는 버튼이 보기나 계산기를 가리지 않게 숨긴다. 처음 화면에서 바꾼다 */
+  :root[data-theme=dark] .ok { color: #5ccf86; } :root[data-theme=dark] .no { color: #ff7b72; }
+  :root[data-theme=dark] .guess, :root[data-theme=dark] .chat small, :root[data-theme=dark] .code { color: #a2a8b0; }
 </style>
 <main id="app"></main>
 <!-- 실전 프로그램에도 화면 안 계산기와 그림판이 있다(종이·펜은 금지). 문제마다 비운다 -->
@@ -91,7 +102,7 @@ function stopwatch(area, already = 0) {
   document.getElementById('swreset').onclick = () => { if (running) { t0 = now(); draw(); } }; // 답한 뒤에는 이미 기록한 시간이라 바꾸지 않는다
   const draw = () => {
     const s = (now() - t0) / 1000, over = s > limit;
-    el.style.background = over ? '#c22' : `conic-gradient(#0a7a2f ${(1 - s / limit) * 360}deg, #e5e5e5 0)`;
+    el.style.background = over ? 'var(--no, #c22)' : `conic-gradient(var(--ok, #0a7a2f) ${(1 - s / limit) * 360}deg, var(--track, #e5e5e5) 0)`;
     // 숫자 폭 공백(U+2007)으로 두 자리를 맞춘다. 10초→9초에서 글자 폭이 줄면 막대 줄바꿈이 바뀌어 보기가 밀린다
     txt.textContent = `${String(Math.ceil(over ? s - limit : limit - s)).padStart(2, ' ')}초 ${over ? '초과' : '남음'}`;
     txt.className = over ? 'no' : '';
@@ -170,7 +181,7 @@ const pad = document.getElementById('pad'), ctx = pad.getContext('2d');
 ctx.lineWidth = 2;
 let drawing = false;
 const at = e => { const r = pad.getBoundingClientRect(); return [(e.clientX - r.left) * pad.width / r.width, (e.clientY - r.top) * pad.height / r.height]; };
-pad.onpointerdown = e => { drawing = true; pad.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...at(e)); };
+pad.onpointerdown = e => { drawing = true; ctx.strokeStyle = getComputedStyle(pad).color; pad.setPointerCapture(e.pointerId); ctx.beginPath(); ctx.moveTo(...at(e)); };
 pad.onpointermove = e => { if (drawing) { ctx.lineTo(...at(e)); ctx.stroke(); } };
 pad.onpointerup = pad.onpointercancel = () => { drawing = false; };
 const wipe = () => ctx.clearRect(0, 0, pad.width, pad.height);

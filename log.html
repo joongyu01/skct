@@ -4,6 +4,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>접속 기록</title>
+<script src="theme.js?v=1"></script>
 <style>
   html { background: #fff; -webkit-text-size-adjust: 100%; }
   body { font: 16px/1.5 system-ui, sans-serif; max-width: 1100px; margin: 0 auto; padding: 12px; background: #fff; color: #111; }
@@ -12,6 +13,14 @@
   th, td { border: 1px solid #999; padding: 4px 8px; text-align: left; white-space: nowrap; }
   td.ua { white-space: normal; min-width: 240px; font-size: .85em; color: #555; }
   .me { background: #eef6ff; }
+  /* 어두운 화면(오른쪽 아래 버튼, theme.js). 밝은 화면 규칙은 그대로 두고 덮어쓴다 */
+  :root[data-theme=dark] { color-scheme: dark; }
+  :root[data-theme=dark], :root[data-theme=dark] body { background: #1b1d21; }
+  :root[data-theme=dark] body { color: #d9dce1; }
+  :root[data-theme=dark] a { color: #8ab4f8; }
+  :root[data-theme=dark] th, :root[data-theme=dark] td { border-color: #4a4f57; }
+  :root[data-theme=dark] td.ua { color: #a2a8b0; }
+  :root[data-theme=dark] .me { background: #1f3350; }
 </style>
 <h1>접속 기록</h1>
 <p><a href="./">연습 사이트로</a></p>
