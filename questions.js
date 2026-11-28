@@ -1315,7 +1315,7 @@ const range = () => {
 const missing = () => {
   const rows = ['가', '나', '다', '라'], v = rows.map(() => R(12, 95) * 10), k = R(0, 3), total = sum(v);
   return numQ('자료해석', T(['구분', ...rows, '합계'], [['인원(명)', ...v.map((x, i) => i === k ? '( A )' : x), won(total)]]) + '( A )에 들어갈 값은?', v[k],
-    `${won(total)} − (${v.filter((_, i) => i !== k).join(' + ')}) = ${v[k]}.`, { step: 10 });
+    `${won(total)} − ${v.filter((_, i) => i !== k).join(' − ')} = ${v[k]}. 계산기에는 괄호가 없으니 나머지를 하나씩 뺀다.`, { step: 10 });
 };
 const jump = () => {
   const ys = [2020, 2021, 2022, 2023, 2024];
@@ -1328,3 +1328,99 @@ const jump = () => {
 // 후기와 강의 모두 자료해석은 일치·불일치(자료이해)가 대부분이라고 해서 두 번 넣는다
 GEN['자료해석'].push(readTable, readTable, range, missing, jump);
 TYPES['자료해석'].push('자료이해', '자료이해', '최대·최소 차', '빈칸 값', '증가량');
+
+// ═════════ 그래프 자료해석, 도형 개수 ═════════
+// 후기(2026년 5월, 같은 4영역 SK 계열사 시험): 자료해석에 그래프를 보고 맞는 것·틀린 것을 고르는 문제가 꽤 많았다. 창의수리 뒤쪽에 사각형 개수 세기 같은 도형 문제가 나온다는 후기도 있다
+// 그래프는 SVG로 그린다. 막대·점 위에 값을 적어 눈금 없이 읽게 하고, 색과 선은 index.html의 #app svg 규칙(class)이 정한다
+// 기록(오답 모음)에서 다시 그릴 때 store.js의 clean()이 이 태그·속성만 남기니, 태그·class를 늘리면 거기도 같이 늘린다
+const r1 = n => Math.round(n * 10) / 10;
+const chart = (kind, labels, vals, unit) => {
+  const w = 460, left = 16, top = 40, base = 200, step = (w - left * 2) / labels.length, max = Math.max(...vals);
+  const x = i => r1(left + step * (i + 0.5)), y = v => r1(base - v / max * (base - top));
+  const marks = kind === 'bar'
+    ? vals.map((v, i) => `<rect class="bar" x="${r1(x(i) - step * 0.3)}" y="${y(v)}" width="${r1(step * 0.6)}" height="${r1(base - y(v))}"/>`).join('')
+    : `<polyline class="ln" points="${vals.map((v, i) => `${x(i)},${y(v)}`).join(' ')}"/>` + vals.map((v, i) => `<circle class="pt" cx="${x(i)}" cy="${y(v)}" r="4"/>`).join('');
+  return `<svg viewBox="0 0 ${w} 230"><text x="${w - 4}" y="16" text-anchor="end">(단위: ${unit})</text>` +
+    `<line class="axis" x1="${left}" y1="${base}" x2="${w - left}" y2="${base}"/>${marks}` +
+    vals.map((v, i) => `<text x="${x(i)}" y="${r1(y(v) - 9)}" text-anchor="middle">${won(v)}</text>`).join('') +
+    labels.map((l, i) => `<text x="${x(i)}" y="${base + 22}" text-anchor="middle">${l}</text>`).join('') + '</svg>';
+};
+// 받침이 있으면 a(은·이·과), 없으면 b(는·가·와)
+const jo = (w, a, b) => w + ((w.charCodeAt(w.length - 1) - 0xAC00) % 28 ? a : b);
+const YEARS = ['2020년', '2021년', '2022년', '2023년', '2024년'];
+const GRAPH = [ // [막대/꺾은선, 제목, 이름들, 무엇, 단위, 한 칸을 부르는 말, 앞 칸을 부르는 말]
+  ['bar', '지점별 판매량', ['A 지점', 'B 지점', 'C 지점', 'D 지점', 'E 지점'], '판매량', '대'],
+  ['bar', '라인별 생산량', ['1라인', '2라인', '3라인', '4라인', '5라인'], '생산량', '톤'],
+  ['bar', '지역별 방문객 수', ['가 지역', '나 지역', '다 지역', '라 지역', '마 지역'], '방문객 수', '명'],
+  ['line', '연도별 생산량', YEARS, '생산량', '톤', '해', '전년'],
+  ['line', '월별 불량품 수', ['1월', '2월', '3월', '4월', '5월'], '불량품 수', '개', '달', '전월'],
+  ['line', '연도별 수출액', YEARS, '수출액', '억 원', '해', '전년'],
+];
+const graphData = () => {
+  const [k, title, names, what, unit, slot, prev] = pick(GRAPH);
+  let v;
+  do { v = names.map(() => R(12, 95) * 10); } while (new Set(v).size < 5);
+  return { k, names, what, unit, slot, prev, v, fig: `<p><b>${title}</b></p>${chart(k, names, v, unit)}` };
+};
+// 그래프를 보고 보기 다섯 개의 참·거짓을 가린다(readTable과 같은 방식). 경계에 걸리는 보기는 만들지 않는다
+const readGraph = () => {
+  const { k, names, what, unit, slot, prev, v, fig } = graphData(), n = names.length, s = sum(v), avg = s / n;
+  const top = v.indexOf(Math.max(...v)), low = v.indexOf(Math.min(...v)), W = jo(what, '이', '가'), WN = jo(what, '은', '는');
+  const makers = [
+    () => { const i = R(0, n - 1); return [`${W} 가장 많은 것은 ${names[i]}이다.`, i === top, `가장 많은 것은 ${names[top]}(${won(v[top])})`]; },
+    () => { const i = R(0, n - 1); return [`${W} 가장 적은 것은 ${names[i]}이다.`, i === low, `가장 적은 것은 ${names[low]}(${won(v[low])})`]; },
+    () => { const [a, b] = shuffle([...names.keys()]).slice(0, 2).sort((p, q) => p - q), d = Math.abs(v[a] - v[b]), N = d + pick([0, 0, 1, -1]) * R(1, 4) * 10;
+      return N <= 0 ? null : [`${jo(names[a], '과', '와')} ${names[b]}의 ${what} 차이는 ${won(N)}${unit}이다.`, N === d, `${names[a]} ${won(v[a])}, ${names[b]} ${won(v[b])} → 차이 ${won(d)}`]; },
+    () => { const [a, b] = shuffle([...names.keys()]), q = pick([1.5, 2, 3]), r = v[a] / v[b];
+      return Math.abs(r - q) < 0.08 * q ? null : [`${names[a]}의 ${WN} ${names[b]}의 ${q}배 이상이다.`, r >= q, `${won(v[a])} ÷ ${won(v[b])} ≈ ${r.toFixed(2)}`]; },
+    () => { const c = v.filter(x => x > avg).length, N = c + pick([0, 0, 1, -1]);
+      return N < 1 || N > 4 || v.includes(avg) ? null : [`${what} 평균보다 많은 것은 ${N}개이다.`, N === c, `평균 ${won(r1(avg))}보다 많은 것은 ${c}개`]; },
+    () => { const N = s + pick([0, 0, 1, -1]) * R(1, 5) * 10; return [`${what}의 합계는 ${won(N)}${unit}이다.`, N === s, `합계 ${won(s)}`]; },
+    ...(k === 'line' ? [
+      () => { const i = R(1, n - 1), up = pick([true, false]);
+        return [`${names[i]}의 ${WN} ${prev}보다 ${up ? '늘었다' : '줄었다'}.`, (v[i] > v[i - 1]) === up, `${names[i - 1]} ${won(v[i - 1])} → ${names[i]} ${won(v[i])}`]; },
+      () => { const c = v.slice(1).filter((x, i) => x > v[i]).length, N = c + pick([0, 0, 1, -1]);
+        return N < 1 || N > n - 1 ? null : [`${prev}보다 ${W} 늘어난 ${jo(slot, '은', '는')} ${N}번이다.`, N === c, `늘어난 ${slot}는 ${c}번`]; },
+    ] : []),
+  ];
+  const want = pick([true, false]), pool = [], seen = new Set(); // want가 true면 "옳은 것", false면 "옳지 않은 것"
+  for (let g = 0; g < 300 && pool.length < 40; g++) { const m = R(0, makers.length - 1), st = makers[m](); if (st && !seen.has(st[0])) { seen.add(st[0]); pool.push([...st, m]); } }
+  // 보기마다 다른 종류의 문장을 쓴다. 합계 문장이 둘이면 둘 중 하나가 틀린 게 보여 답이 거저 나온다
+  const odd = pool.find(st => st[1] === want), used = new Set([odd?.[3]]), rest = [];
+  for (const st of pool) if (st[1] !== want && !used.has(st[3]) && rest.length < 4) { used.add(st[3]); rest.push(st); }
+  if (!odd || rest.length < 4) return readGraph();
+  const choices = shuffle([odd, ...rest]);
+  return { area: '자료해석', q: fig + `그래프에 대한 설명으로 ${want ? '옳은' : '옳지 <u>않은</u>'} 것은?`, choices: choices.map(st => st[0]), answer: choices.indexOf(odd), explain: `${odd[2]}.` };
+};
+// 그래프에서 값 하나 구하기: 막대는 가장 많은 것과 가장 적은 것의 차, 꺾은선은 가장 크게 늘어난 때의 증가량
+const graphCalc = () => {
+  const { k, names, what, unit, slot, prev, v, fig } = graphData(), fmt = x => won(x) + unit;
+  if (k === 'bar') {
+    const mx = Math.max(...v), mn = Math.min(...v);
+    return numQ('자료해석', fig + `${jo(what, '이', '가')} 가장 많은 것과 가장 적은 것의 차이는?`, mx - mn, `${won(mx)} − ${won(mn)} = ${fmt(mx - mn)}.`, { fmt, step: 10, wrongs: [mx + mn] });
+  }
+  const d = v.slice(1).map((x, i) => x - v[i]), best = Math.max(...d), i = d.indexOf(best);
+  if (best <= 0 || d.filter(x => x === best).length > 1) return graphCalc();
+  return numQ('자료해석', fig + `${prev} 대비 ${what} 증가량이 가장 큰 ${slot}의 증가량은?`, best, `${names[i + 1]}: ${won(v[i + 1])} − ${won(v[i])} = ${fmt(best)}.`,
+    { fmt, step: 10, wrongs: d.filter(x => x > 0 && x !== best) });
+};
+GEN['자료해석'].push(readGraph, graphCalc);
+TYPES['자료해석'].push('그래프', '그래프');
+
+// 도형 개수: 격자 그림에서 크고 작은 사각형(정사각형 포함)이나 정사각형을 센다. 가로 선 2개와 세로 선 2개를 고르면 사각형 하나가 정해진다
+const grid = (a, b) => {
+  const c = 34, ls = [];
+  for (let i = 0; i <= a; i++) ls.push(`<line class="axis" x1="${10 + c * i}" y1="10" x2="${10 + c * i}" y2="${10 + c * b}"/>`);
+  for (let j = 0; j <= b; j++) ls.push(`<line class="axis" x1="10" y1="${10 + c * j}" x2="${10 + c * a}" y2="${10 + c * j}"/>`);
+  return `<svg class="fig" viewBox="0 0 ${20 + c * a} ${20 + c * b}">${ls.join('')}</svg>`;
+};
+const shapes = () => {
+  const a = R(2, 5), b = R(2, 4), sq = pick([true, false]), rect = comb(a + 1, 2) * comb(b + 1, 2);
+  const parts = [...Array(Math.min(a, b))].map((_, k) => (a - k) * (b - k)), sqn = sum(parts);
+  return numQ('창의수리', `다음 그림에서 찾을 수 있는 크고 작은 ${sq ? '정사각형' : '사각형(정사각형 포함)'}은 모두 몇 개인가?${grid(a, b)}`, sq ? sqn : rect,
+    sq ? `${parts.map((p, k) => `한 변 ${k + 1}칸 ${p}개`).join(' + ')} = ${sqn}개.`
+      : `사각형 하나 = 가로 선 2개 + 세로 선 2개. 가로 선 ${b + 1}개에서 2개 고르기 ${comb(b + 1, 2)}가지 × 세로 선 ${a + 1}개에서 2개 고르기 ${comb(a + 1, 2)}가지 = ${rect}개.`,
+    { fmt: x => x + '개', wrongs: sq ? [a * b, rect] : [a * b, sqn, comb(a + 1, 2) + comb(b + 1, 2)] });
+};
+GEN['창의수리'].push(shapes);
+TYPES['창의수리'].push('도형 개수');

@@ -22,14 +22,18 @@ function hash(s) {
 }
 const keyOf = q => q._k ||= hash(q.q + '|' + q.choices[q.answer]);
 
-// 서버에서 온 문제 내용은 누구나 쓸 수 있으므로 믿지 않는다. 문제에 쓰는 태그만 속성 없이 남기고 나머지는 글자로 바꾼다
-const TAGS = new Set(['P', 'B', 'U', 'BR', 'TABLE', 'TBODY', 'THEAD', 'TR', 'TH', 'TD']);
+// 서버에서 온 문제 내용은 누구나 쓸 수 있으므로 믿지 않는다. 문제에 쓰는 태그만 남기고 나머지는 글자로 바꾼다
+// 그래프·도형(SVG, 소문자 태그)은 좌표 숫자, 정해 둔 class, 글자 정렬만 남긴다. 스크립트나 링크가 들어갈 속성은 모두 지운다
+const TAGS = new Set(['P', 'B', 'U', 'BR', 'TABLE', 'TBODY', 'THEAD', 'TR', 'TH', 'TD', 'svg', 'line', 'rect', 'polyline', 'circle', 'text']);
+const NUMS = /^[-\d., ]+$/;
+const ATTRS = { viewBox: NUMS, x: NUMS, y: NUMS, width: NUMS, height: NUMS, x1: NUMS, y1: NUMS, x2: NUMS, y2: NUMS, cx: NUMS, cy: NUMS, r: NUMS, points: NUMS,
+  class: /^(axis|bar|ln|pt|fig)$/, 'text-anchor': /^(start|middle|end)$/ };
 function clean(html) {
   const t = document.createElement('template');
   t.innerHTML = String(html);
   for (const el of [...t.content.querySelectorAll('*')].reverse()) { // 안쪽부터: 바깥 요소를 글자로 바꿔도 안쪽 처리가 끝난 뒤다
     if (!TAGS.has(el.tagName)) el.replaceWith(el.textContent);
-    else for (const a of [...el.attributes]) el.removeAttribute(a.name);
+    else for (const a of [...el.attributes]) if (el.namespaceURI !== 'http://www.w3.org/2000/svg' || !ATTRS[a.name]?.test(a.value)) el.removeAttribute(a.name);
   }
   return t.innerHTML;
 }

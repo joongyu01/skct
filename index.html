@@ -14,6 +14,13 @@
   input[type=password] { font: inherit; padding: 8px; max-width: 100%; box-sizing: border-box; }
   table { border-collapse: collapse; margin: 8px 0; display: block; overflow-x: auto; max-width: 100%; } /* 좁은 화면(스플릿 뷰)에서 표만 가로 스크롤 */
   th, td { border: 1px solid #999; padding: 4px 10px; text-align: center; }
+  /* 그래프·도형(questions.js의 chart·grid). 글자와 축은 글자색을 따라가 어두운 화면에서도 보인다 */
+  #app svg { display: block; width: 100%; max-width: 460px; height: auto; margin: 8px 0; font-size: 14px; }
+  #app svg.fig { max-width: 220px; }
+  #app svg text { fill: currentColor; }
+  #app svg .axis { stroke: currentColor; stroke-width: 1.5; }
+  #app svg .bar, #app svg .pt { fill: #5b8def; }
+  #app svg .ln { fill: none; stroke: #5b8def; stroke-width: 2.5; }
   #bar { position: sticky; top: 0; background: #fff; padding: 8px 0; border-bottom: 2px solid #333; display: flex; flex-wrap: wrap; gap: 0 12px; justify-content: space-between; }
   #bar > * { white-space: nowrap; } /* 좁으면 낱말 중간이 아니라 항목 단위로 줄을 바꾼다 */
   .ok { color: #0a7a2f; } .no { color: #c22; }
@@ -66,9 +73,9 @@
   <canvas id="pad" width="500" height="380" aria-label="그림판. 마우스로 끌어서 씁니다"></canvas>
 </aside>
 <!-- ?v=: 배포 뒤 새 페이지가 캐시에 남은 옛 스크립트와 섞여 빈 화면이 되지 않게, 고칠 때마다 올린다 -->
-<script src="questions.js?v=10"></script>
-<script src="bank-data.js?v=5"></script>
-<script src="store.js?v=8"></script>
+<script src="questions.js?v=11"></script>
+<script src="bank-data.js?v=6"></script>
+<script src="store.js?v=9"></script>
 <script src="visit.js?v=3"></script>
 <script>
 const app = document.getElementById('app');
