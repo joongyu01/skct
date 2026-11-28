@@ -71,10 +71,12 @@ const store = {
     }
     return out;
   },
-  log(q, ok, sec, mode) {
+  // mine: 고른 답(0~4, -1 모르겠음, null 안 고름)
+  log(q, ok, sec, mode, mine = null) {
     const t = Math.round(Date.now() / 1000);
-    const body = ok ? null : { q: q.q, choices: q.choices, answer: q.answer, explain: q.explain }; // 틀린 문제만 내용을 남긴다(오답 모음)
-    this.outbox.push({ area: q.area, type: typeOf(q), qkey: keyOf(q), ok: !!ok, sec: sec ?? null, mode, t, q: body });
+    const full = { q: q.q, choices: q.choices, answer: q.answer, explain: q.explain };
+    // q: 틀린 문제만 내용을 남긴다(오답 모음, 기기에도 받아 둔다). body: 모든 문제의 내용과 고른 답(서버에만 두고 받아 오지 않는다. 문제 코드로 찾을 때 쓴다)
+    this.outbox.push({ area: q.area, type: typeOf(q), qkey: keyOf(q), ok: !!ok, sec: sec ?? null, mode, t, q: ok ? null : full, body: { ...full, mine } });
     this.seen.set(keyOf(q), t);
     this.save();
   },
@@ -109,7 +111,7 @@ const store = {
     const unsent = this.outbox.filter(o => !o.sent).slice(0, 500);
     if (unsent.length) {
       // 모든 행의 키를 같게 맞춘다(예전 형식 기록이 섞이면 서버가 묶음 전체를 거절한다). 시각은 올린 때가 아니라 푼 때
-      const body = unsent.map(o => ({ area: o.area, type: o.type, qkey: o.qkey, ok: !!o.ok, sec: o.sec ?? null, mode: o.mode, q: o.q ?? null, ts: new Date(o.t * 1000).toISOString() }));
+      const body = unsent.map(o => ({ area: o.area, type: o.type, qkey: o.qkey, ok: !!o.ok, sec: o.sec ?? null, mode: o.mode, q: o.q ?? null, body: o.body ?? null, ts: new Date(o.t * 1000).toISOString() }));
       const r = await fetch(API, { method: 'POST', headers: { ...this.headers(), Prefer: 'return=minimal' }, body: JSON.stringify(body) });
       if (!r.ok) throw new Error('보내기 실패 ' + r.status);
       unsent.forEach(o => o.sent = 1); // 받아 올 때까지 outbox에 둔다. 그사이 집계에서 빠지지 않게

@@ -9,22 +9,41 @@ const MODEL = "claude-opus-5-5";
 const PRICE = { input: 4 / 1e6, output: 20 / 1e6 }; // claude-opus-5-5 달러/토큰
 const NUM = "①②③④⑤";
 
-const SYSTEM = `너는 SK하이닉스 전임직(Maintenance/Operator) 채용 SKCT 인지검사를 준비하는 학생의 과외 선생님이다. 학생은 고졸 전형이고 시험이 며칠 남지 않았다.
-- 첫 메시지에 붙은 한 문제를 두고 학생이 묻는 것에 답한다. 이 문제나 SKCT 푸는 요령과 관계없는 요청에는 한 문장으로 거절하고 이 문제로 돌아온다.
-- 과외 선생님처럼 친근한 해요체로, 옆에서 같이 푸는 것처럼 설명한다. 정답만 알려 주지 말고 "문제를 보면 먼저 무엇을 보는지 → 어떻게 계산하거나 판단하는지 → 왜 그게 답인지" 순서로 푸는 방법을 가르친다.
-- 학생이 고른 답이 틀렸으면 어디서 헷갈렸을지 짚어 주고, 맞았으면 더 빨리 푸는 길을 알려 준다.
-- 실전에서 빨리 푸는 요령(어림셈, 끝자리 보기, 보기끼리 비교, 지우기)을 꼭 하나 넣는다. 실전 화면 계산기는 사칙연산과 루트만 되고 괄호가 없으며 누르는 순서대로 계산한다. 종이와 펜은 쓸 수 없고 화면 그림판만 있다.
-- 실전 문항당 시간: 언어표현 6초, 언어이해 21초, 창의수리 30초, 자료해석 30초. 이 시간 안에 푸는 방법을 기준으로 가르친다.
-- 마지막에 "비슷한 문제가 나오면 이렇게 하세요" 식으로 한 줄로 정리한다.
-- 사이트 정답과 해설도 틀릴 수 있다. 설명하기 전에 직접 풀어 보고, 사이트 정답이 틀렸다고 판단되면 그 사실과 근거를 분명히 말한다.
-- 짧게 쓴다. 계산은 한 줄에 한 단계씩 쓴다. 마크다운 기호(#, *, **, 표)를 쓰지 말고 일반 글로 쓴다. 목록이 필요하면 1. 2. 처럼 숫자를 쓴다.`;
+// 학생 요청(11/28): 원론부터 말하지 말고 이 문제의 이 숫자를 보고 바로 답을 고르는 눈대중 지름길부터. 같은 유형도 보기 숫자에 따라 지름길이 달라지므로
+// 그 판단을 시키고, 눈대중으로 안 갈릴 때만 계산기를 쓰게 한다
+const SYSTEM = `너는 SK하이닉스 전임직(Maintenance/Operator) SKCT 인지검사를 며칠 앞둔 고졸 전형 학생의 과외 선생님이다. 실전은 문항당 언어표현 6초, 언어이해 21초, 창의수리 30초, 자료해석 30초라 정석 풀이로는 시간이 모자란다. 학생에게 필요한 것은 "이 문제의 이 숫자"를 보고 계산기 없이 눈대중으로 바로 답을 고르는 방법이다.
+
+쓰기 전에 속으로 할 일(글로 쓰지 않는다):
+1. 직접 풀어 정답을 확인한다. 사이트 정답이 틀렸으면 맨 앞에 그 사실과 근거를 말한다.
+2. 보기 다섯 개를 먼저 보고, 이 숫자들에서 답이 가장 빨리 갈리는 눈대중 지름길을 고른다. 같은 유형이라도 숫자에 따라 지름길이 다르다. 예:
+- 보기 끝자리(일의 자리나 끝 두 자리)가 모두 다르다: 끝자리만 계산한다.
+- 보기끼리 차이가 크다(서로 10% 넘게): 앞 두 자리만 남기고 반올림해 어림한다.
+- 짝홀, 5의 배수, 9의 배수(자릿수 합)처럼 성질로 갈린다: 그 성질 하나만 본다.
+- 방정식·조건 문제: 보기를 조건에 넣어 본다(가운데 보기부터, 크면 작은 쪽으로).
+- 크기 비교: 1, 절반, 100% 같은 기준값과 비교하거나 분수는 교차 곱.
+- 언어 문제: 답을 정하는 단서 단어 하나와, 바로 지워지는 보기.
+이 목록에 없어도 이 숫자에 가장 빠른 눈대중 방법을 쓴다.
+3. 계산기는 마지막 수단이다. 보기가 촘촘해 어떤 눈대중으로도 갈리지 않을 때만 계산기를 쓰고, 그때는 누르는 순서를 가장 짧게 준다. 눈대중으로 갈리는 문제에 계산기 풀이를 덧붙이지 않는다.
+
+쓰는 형식(인사말, 원론, 일반론 없이 바로):
+1) 첫 줄에 답, 방법, 걸리는 시간을 한 줄로. 예: "③ 870. 보기 끝자리가 다 달라서 끝자리만 보면 5초." 계산기가 필요하면 예: "② 1,284. 보기가 10 차이라 눈대중으로는 안 갈려요. 계산기로 12초."
+2) 이 문제 숫자로 그 방법을 따라 하는 과정. 한 줄에 한 단계, 3~5줄. 계산기를 쓸 때는 "계산기: 2060 − 190 − 540 − 460 =" 처럼 누르는 순서 그대로.
+3) "숫자가 바뀌면:"으로 시작하는 한두 줄. 같은 유형인데 보기가 어떻게 생기면 이 방법이 안 통하고 무엇으로 바꾸는지(눈대중이 안 통하면 계산기로 넘어가는 기준 포함).
+4) 학생이 고른 답이 틀렸으면 왜 그 보기를 골랐을지 한 줄.
+정석 풀이는 학생이 물을 때만, 또는 눈대중만으로 확신이 안 설 때만 한두 줄 붙인다.
+
+학생이 더 물으면 일반 원칙 목록을 늘어놓지 말고 이 문제의 숫자로 바로 답한다. "보통 어떻게 보냐"고 물어도 이 문제에 적용한 결과부터 말하고, 기준은 한두 줄로 붙인다.
+실전 화면 계산기는 사칙연산과 루트만 되고 괄호가 없으며 누르는 순서대로 계산한다. 종이와 펜은 없고 화면 그림판만 있다.
+이 문제나 SKCT 푸는 요령과 관계없는 요청은 한 문장으로 거절하고 이 문제로 돌아온다.
+친근한 해요체로 짧게 쓴다. 마크다운 기호(#, *, **, 표)는 쓰지 않는다. 목록은 1. 2.처럼 숫자로 쓴다.`;
 
 const str = (v: unknown, max: number) => typeof v === "string" && v.length <= max;
 
 // 사이트가 보낸 값이 형식에 맞는지 본다. 남이 아무 글이나 길게 보내 비용을 키우지 못하게 길이도 자른다
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 function valid(b: any) {
   const q = b?.q, ms = b?.messages, mine = b?.mine;
-  return q && str(q.area ?? "", 40) && str(q.type ?? "", 60) && str(q.q, 12000) && str(q.explain ?? "", 4000) &&
+  return q && (b.chat == null || (typeof b.chat === "string" && UUID.test(b.chat))) && (b.qkey == null || str(b.qkey, 40)) && str(q.area ?? "", 40) && str(q.type ?? "", 60) && str(q.q, 12000) && str(q.explain ?? "", 4000) &&
     Array.isArray(q.choices) && q.choices.length === 5 && q.choices.every((c: unknown) => str(c, 600)) &&
     Number.isInteger(q.answer) && q.answer >= 0 && q.answer < 5 &&
     (mine == null || (Number.isInteger(mine) && mine >= -1 && mine < 5)) &&
@@ -68,6 +87,15 @@ Deno.serve(async (req) => {
     return fail(500, "로그인을 확인하지 못했어요.");
   }
 
+  // ?chats: 저장된 AI 선생님 대화 목록(최근 것부터)
+  if (req.method === "GET" && new URL(req.url).searchParams.has("chats")) {
+    try {
+      return new Response(JSON.stringify(await rpc("skct_ai_chat_list", { lim: 300 })), { headers: { ...cors, "Content-Type": "application/json", "Cache-Control": "no-store" } });
+    } catch (e) {
+      console.error(e);
+      return fail(500, "대화 기록을 불러오지 못했습니다.");
+    }
+  }
   // 남은 크레딧: 충전액(credit, 모르면 null) - 이 함수로 쓴 비용 합계(spent). 다른 곳에서 같은 키를 쓰면 그만큼 어긋난다
   if (req.method === "GET") {
     try {
@@ -122,12 +150,21 @@ Deno.serve(async (req) => {
           betas: ["server-side-fallback-2026-07-01"],
           fallbacks: "default", // 안전 분류기가 거절하면 서버가 다른 모델로 다시 답한다
         });
-        stream.on("text", put);
+        let text = "";
+        stream.on("text", (t: string) => { text += t; put(t); });
         const final = await stream.finalMessage();
         // shortcut: 다른 모델로 넘어간 답도 opus 값으로 계산하고, 중간에 끊긴 답은 세지 않는다. 남은 금액이 실제와 어긋나면 콘솔 금액으로 credit을 다시 맞춘다
         await rpc("skct_ai_spend", { usd: final.usage.input_tokens * PRICE.input + final.usage.output_tokens * PRICE.output }).catch(console.error);
         if (final.stop_reason === "max_tokens") put("\n\n(답이 길어 여기서 끊겼습니다.)");
         if (final.stop_reason === "refusal") put("\n\n(이 질문에는 답하지 못했습니다. 다르게 물어봐 주세요.)");
+        // 대화 기록: 사이트가 대화 id를 보냈고 답을 다 받았을 때만. 같은 대화의 다음 질문은 같은 행을 고친다
+        else if (b.chat && text.trim()) {
+          await rpc("skct_ai_log", {
+            p_chat: b.chat, p_area: q.area ?? "", p_type: q.type ?? "", p_qkey: b.qkey ?? null,
+            p_q: { q: q.q, choices: q.choices, answer: q.answer, explain: q.explain ?? "" }, p_mine: mine ?? null,
+            p_messages: [...b.messages, { role: "assistant", content: text }],
+          }).catch(console.error);
+        }
       } catch (e) {
         if (!(e instanceof Anthropic.APIUserAbortError)) { console.error(e); put(`\n\n[오류] ${errText(e)}`); }
       }

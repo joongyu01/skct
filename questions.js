@@ -10,20 +10,22 @@ const won = n => n.toLocaleString('ko-KR');
 const sum = arr => arr.reduce((a, b) => a + b, 0);
 const sg = d => (d > 0 ? '+' : '−') + Math.abs(d);
 
+// gen()이 먼저 정한 정답 자리(0~4). numQ가 그 자리를 만들 수 없으면(정답이 너무 작거나 커서 한쪽 보기가 모자람) NO_RANK를 던져 gen()이 숫자를 새로 뽑게 한다
+let wantRank = null;
+const NO_RANK = {};
 // 정답이 숫자인 문제. 오답 = wrongs(그럴듯한 함정) + 정답±step 으로 4개를 채운다. 값은 전부 정수로 넘길 것.
 function numQ(area, q, ans, explain, { wrongs = [], step = 1, fmt = String, neg = false, max = Infinity } = {}) {
   const ok = v => v !== ans && (neg || v > 0) && v < max;
-  const set = new Set(wrongs.filter(ok).slice(0, 4));
-  // 정답이 작은 순으로 몇 번째에 올지 먼저 고르고 그만큼 아래·위를 채운다. ±step을 고르게 섞으면 정답이 늘 가운데라 위치만 보고 찍힌다
-  const below = () => [...set].filter(v => v < ans).length, above = () => set.size - below();
-  const rank = R(below(), 4 - above());
-  for (const [dir, need] of [[-1, () => below() >= rank], [1, () => above() >= 4 - rank]])
-    for (const k of shuffle([1, 2, 3, 4, 5, 6])) { if (need()) break; if (ok(ans + dir * k * step)) set.add(ans + dir * k * step); }
-  for (const k of shuffle([1, 2, 3, 4, 5, 6, -1, -2, -3, -4, -5, -6])) { // 한쪽이 막히면(0 이하·상한) 반대쪽으로 채운다
-    if (set.size >= 4) break;
-    if (ok(ans + k * step)) set.add(ans + k * step);
-  }
-  const vals = [ans, ...set].sort((a, b) => a - b);
+  // 정답보다 작은 쪽(dir −1)·큰 쪽(+1) 후보: 함정을 넘긴 순서대로 먼저, 그다음 정답±step 배수(가까운 6칸은 섞고, 모자라면 12칸까지)
+  const side = dir => [...new Set([...wrongs.filter(v => ok(v) && (v - ans) * dir > 0),
+    ...[...shuffle([1, 2, 3, 4, 5, 6]), 7, 8, 9, 10, 11, 12].map(k => ans + dir * k * step).filter(ok)])];
+  const lo = side(-1), hi = side(1);
+  // 보기는 작은 순이라 정답 자리 = 정답보다 작은 보기 수. 그 수를 0~4에서 고르게 먼저 뽑고, 그쪽에 넘치는 함정은 버린다.
+  // 함정에 맞춰 자리를 정하면 함정이 대개 정답보다 커서 ⑤가 거의 정답이 되지 않는다. 한쪽이 막히면(0 이하·상한) 될 수 있는 가장 가까운 자리로
+  const want = wantRank ?? R(0, 4);
+  if (wantRank !== null && (want > lo.length || 4 - want > hi.length)) throw NO_RANK;
+  const rank = Math.max(4 - hi.length, Math.min(want, lo.length));
+  const vals = [...lo.slice(0, rank), ans, ...hi.slice(0, 4 - rank)].sort((a, b) => a - b);
   return { area, q, choices: vals.map(fmt), answer: vals.indexOf(ans), explain };
 }
 
@@ -401,10 +403,11 @@ const GEN = {
         explain: '여성 비율: ' + names.map((x, i) => `${x} ${r[i].toFixed(1)}%`).join(' / ') };
     },
     () => {
-      let v, avg;
-      do { v = [0, 0, 0, 0, 0].map(() => R(10, 60) * 10); avg = sum(v) / 5; } while (v.includes(avg));
-      const over = v.map((x, i) => x > avg ? `${i + 1}월` : '').filter(Boolean);
-      return { area: '자료해석', q: T(['월', '1월', '2월', '3월', '4월', '5월'], [['판매량(대)', ...v]]) + '5개월 평균 판매량보다 판매량이 많은 달은 몇 개인가?',
+      // 6개월이면 평균보다 많은 달은 1~5개라 보기 1~5개가 모두 정답이 될 수 있다. 몇 개가 정답일지 먼저 고르게 뽑고 그에 맞는 자료를 만든다
+      const want = R(1, 5);
+      let v, avg, over;
+      do { v = [0, 0, 0, 0, 0, 0].map(() => R(10, 60) * 10); avg = sum(v) / 6; over = v.map((x, i) => x > avg ? `${i + 1}월` : '').filter(Boolean); } while (v.includes(avg) || !Number.isInteger(avg) || over.length !== want);
+      return { area: '자료해석', q: T(['월', '1월', '2월', '3월', '4월', '5월', '6월'], [['판매량(대)', ...v]]) + '6개월 평균 판매량보다 판매량이 많은 달은 몇 개인가?',
         choices: ['1개', '2개', '3개', '4개', '5개'], answer: over.length - 1,
         explain: `평균 ${avg}대 → ${over.join(', ')}.` };
     },
@@ -417,7 +420,29 @@ const TYPES = {
   '창의수리': ['농도', '일률', '거리·속력', '확률', '원가·할인', '나이', '경우의 수', '평균', '기차·터널'],
   '자료해석': ['증가율', '가중평균', '비중', '인구밀도', '무역수지', '비율 비교', '평균 초과'],
 };
-const gen = area => { const i = R(0, GEN[area].length - 1), q = GEN[area][i](); q.type ??= TYPES[area][i]; return q; };
+// i번 출제기로 한 문제. 정답 자리를 0~4에서 고르게 먼저 정하고, 그 자리를 못 만드는 숫자가 나오면 다시 뽑는다(20번까지 안 되면 가까운 자리로)
+const genAt = (area, i) => {
+  const g = GEN[area][i], f = g.fs ? pick(g.fs) : g; // 변형이 있는 유형은 변형을 먼저 고정한다
+  wantRank = R(0, 4);
+  try { for (let t = 0; t < 20; t++) try { return f(); } catch (e) { if (e !== NO_RANK) throw e; } }
+  finally { wantRank = null; }
+  return f();
+};
+const gen = area => { const i = R(0, GEN[area].length - 1), q = genAt(area, i); q.type ??= TYPES[area][i]; return q; };
+// 문제 코드: 영역-유형 번호-문제 키 앞 5자리(예: 창의수리-07-3f9k2). 다른 Claude 세션에서 이 문제를 찾아 물어볼 때 쓴다(tools/find-question.js가 같은 규칙으로 찾는다).
+// 유형 번호는 사람이 보기 위한 것이다(TYPES 순서, 그 뒤 고정 문제에 처음 나온 순서). 유형이 늘면 번호가 밀릴 수 있어 찾을 때는 영역과 키만 쓴다
+let TYPE_NO;
+const codeOf = q => {
+  if (!TYPE_NO) {
+    TYPE_NO = {};
+    const add = (a, t) => { const l = TYPE_NO[a] ||= []; if (!l.includes(t)) l.push(t); };
+    for (const [a, ts] of Object.entries(TYPES)) ts.forEach(t => add(a, t));
+    ['최단경로', '여사건 확률'].forEach(t => add('창의수리', t)); // 출제기가 직접 붙이는 유형 이름
+    for (const s of QUESTIONS) add(s.area, typeOf(s));
+  }
+  const n = (TYPE_NO[q.area] || []).indexOf(typeOf(q)) + 1;
+  return `${q.area}-${String(n).padStart(2, '0')}-${keyOf(q).slice(0, 5)}`;
+};
 const typeOf = q => q.type || (/일치/.test(q.q) ? '내용 일치' : /주제/.test(q.q) ? '주제' : /배열/.test(q.q) ? '문단 배열' : /빈칸/.test(q.q) ? '빈칸' : /반박|약화/.test(q.q) ? '반박·사례' : /추론/.test(q.q) ? '추론' : '기타');
 
 // ═════════ 창의수리 문장형 변형: 같은 유형 안에서도 묻는 방식이 매번 달라지게 한다 ═════════
@@ -814,7 +839,8 @@ const V_자료해석 = {
 
 // 변형을 기존 출제기와 한 항목으로 묶는다. GEN의 순서·개수가 그대로여야 통계용 유형 이름(TYPES)이 맞는다
 // 이 시점의 TYPES에는 기본 유형만 있다(연산·기하 등은 아래에서 push)
-const variants = (...fs) => () => pick(fs)();
+// fs를 붙여 둔다: genAt이 변형을 한 번만 고르고 그 변형의 숫자만 다시 뽑게(다시 뽑을 때마다 변형을 새로 고르면 정답 자리를 맞추기 어려운 변형이 덜 나온다)
+const variants = (...fs) => Object.assign(() => pick(fs)(), { fs });
 TYPES['창의수리'].forEach((t, i) => { GEN['창의수리'][i] = variants(GEN['창의수리'][i], ...V_창의수리[t]); });
 TYPES['자료해석'].forEach((t, i) => { GEN['자료해석'][i] = variants(GEN['자료해석'][i], ...V_자료해석[t]); });
 
@@ -964,8 +990,10 @@ const compare = () => {
     const n = R(8, 45) * 20, p = R(3, 19) * 5, v = n * p / 100, m = v + pick([0, 0, 1, -1, 3, -4, 7, -8]);
     l = `${n}의 ${p}%`; r = String(m); lv = v; rv = m; note = `${l} = ${v}`;
   }
-  return { area: '창의수리', q: `다음 수식의 대소를 비교하시오.<p><b>${l} □ ${r}</b></p>`, choices: SIGNS,
-    answer: lv < rv ? 0 : lv > rv ? 1 : 4, explain: `${note}. 값이 다르면 &lt; 또는 &gt;, 같으면 = 를 고른다.` };
+  // 정답은 <, >, = 셋뿐이라 부등호 순서를 고정하면 ①②⑤만 정답이 된다. 순서를 섞어 정답 자리를 고르게 한다
+  const choices = shuffle(SIGNS), right = lv < rv ? '&lt;' : lv > rv ? '&gt;' : '=';
+  return { area: '창의수리', q: `다음 수식의 대소를 비교하시오.<p><b>${l} □ ${r}</b></p>`, choices,
+    answer: choices.indexOf(right), explain: `${note}. 값이 다르면 &lt; 또는 &gt;, 같으면 = 를 고른다.` };
 };
 const blank = () => {
   if (R(0, 3) === 0) { // 소수 빈칸(17 − □ × 4.4 = 1.6 꼴). 전임직 대비 영상에 나온 형태. 값은 10배 한 정수로 다룬다
