@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>심층검사 연습 · SKCT</title>
   <script>try { if (!JSON.parse(localStorage.getItem('skct-token'))) location.replace('./'); } catch { location.replace('./'); }</script>
-  <meta http-equiv="Content-Security-Policy" content="connect-src 'none'; form-action 'none'">
+  <meta http-equiv="Content-Security-Policy" content="connect-src https://jgkgacuzpoxkjuxcrjxc.supabase.co; form-action 'none'">
   <style>
     :root { color-scheme: light; background: #fff; color: #17191c; -webkit-text-size-adjust: 100%; }
     * { box-sizing: border-box; }
@@ -74,6 +74,7 @@
     .warn { color: #794214; font-size: .94em; flex: 1 1 220px; }
     .actions button { min-width: 95px; }
     #results-back { margin: 20px 0; }
+    .end-row { margin: 28px 0 10px; border-top: 1px solid #d2d5d9; padding-top: 14px; }
     .sr-only { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
     @media (max-width: 660px) {
       body { font-size: 17px; padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)); }
@@ -140,7 +141,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
       </div>
       <details class="guide-note"><summary>응답 방법과 추정 범위</summary><ul>
         <li>Part 1은 세 문장을 각각 1~6으로 평정하고 서로 다른 두 문장에 ‘멀다’와 ‘가깝다’를 표시합니다. 세 평정에 모두 같은 숫자를 골라도 됩니다. Part 2는 평정만 합니다.</li>
-        <li>문항과 결과 지표는 연습용입니다. 완료한 결과는 이 브라우저에만 최근 5회까지 저장합니다.</li>
+        <li>문항과 결과 지표는 연습용입니다. 결과는 서버와 이 기기에 저장되어 어느 기기에서 풀었든 최근 5회를 비교합니다. 풀이 중 "여기까지 결과 보기"를 누르면 그때까지 푼 부분(예: Part 1만)으로 결과를 냅니다.</li>
         <li><b>추정</b> · 각 파트 앞의 1분 준비, 한 화면 분량(Part 1 한 묶음, Part 2 다섯 문항), 타이머 위치·전환 방식, 미응답 안내 후 이동은 연습 화면의 설정입니다.</li>
         <li><b>추정</b> · Part 2도 Part 1과 같은 여섯 칸 문구로 표시합니다. 공식 안내에서 칸마다 문구를 확인한 화면은 Part 1입니다.</li>
         <li><b>추정</b> · 응답2의 같은 칸을 다시 누르면 해제되고 같은 문장의 반대 칸을 누르면 선택이 옮겨집니다. 반복 간격·횟수, Part 2의 부정적 문장 비중과 복기 기준도 연습용입니다.</li>
@@ -150,10 +151,12 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     <div id="active" hidden>
       <div class="test-bar"><b id="phase-label"></b><span>남은 시간 <time id="clock" role="timer"></time></span></div>
       <div id="panel"></div>
+      <p class="end-row"><button type="button" class="button" id="end-early" hidden>여기까지 결과 보기</button></p>
     </div>
     <section id="completed" hidden><div class="lead"><h1 tabindex="-1" id="result-heading">연습 결과</h1><p id="result-caption"></p></div><div id="results"></div><button class="button" type="button" id="results-back">연습 처음으로</button></section>
     <noscript>이 연습을 사용하려면 브라우저에서 자바스크립트를 켜세요.</noscript>
   </main>
+  <script src="store.js?v=7"></script>
   <script src="deep-items.js?v=1"></script>
   <script>
 (() => {
@@ -165,6 +168,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
   const fraction = (count, total) => total ? `${count} / ${total}` : '비교 대상 없음';
   const averageTime = value => Number.isFinite(value) ? `${value.toFixed(1)}초` : '기록 없음';
   const endsPercent = ends => Number.isFinite(ends.ratio) ? `${(ends.ratio * 100).toFixed(1)}%` : '응답 없음';
+  const runName = run => modes[run.mode] + (run.scope === 'part' ? ' · 중간까지' : '');
 
   function node(tag, text, className) {
     const el = document.createElement(tag);
@@ -175,7 +179,8 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
 
   function validRun(run) {
     if (!run || typeof run.mode !== 'string' || !Object.hasOwn(modes, run.mode) || typeof run.runId !== 'string'
-      || typeof run.completedAt !== 'number' || !Number.isFinite(new Date(run.completedAt).getTime())) return false;
+      || typeof run.completedAt !== 'number' || !Number.isFinite(new Date(run.completedAt).getTime())
+      || ![undefined, 'all', 'part'].includes(run.scope)) return false;
     const d = run.data;
     const count = x => Number.isInteger(x) && x >= 0;
     const value = x => x && typeof x.text === 'string' && Number.isInteger(x.value) && x.value >= 1 && x.value <= 6
@@ -203,6 +208,16 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     } catch {
       return {runs: [], notice: '이 브라우저에서 이전 기록을 읽을 수 없습니다.'};
     }
+  }
+
+  // 서버에 올린 기록 표시. 올린 기록은 다시 올리지 않는다(다른 기기에서 기록을 지웠을 때 이 기기 사본이 되살리지 않게)
+  function markSent(ids) {
+    try {
+      const raw = JSON.parse(localStorage.getItem(historyKey) || '[]');
+      if (!Array.isArray(raw)) return;
+      for (const run of raw) if (run && ids.includes(run.runId)) run.sent = true;
+      localStorage.setItem(historyKey, JSON.stringify(raw));
+    } catch {}
   }
 
   function saveRun(run) {
@@ -335,7 +350,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     label.scope = 'col';
     head.append(label);
     for (const run of runs) {
-      const cell = node('th', modes[run.mode]);
+      const cell = node('th', runName(run));
       cell.scope = 'col';
       cell.append(document.createElement('br'), node('small', dateOf(run)));
       head.append(cell);
@@ -356,7 +371,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     host.replaceChildren(node('h2', '최근 5회 비교'));
     if (saved.notice) host.append(node('p', saved.notice, 'deep-note'));
     if (!saved.runs.length) {
-      if (!saved.notice) host.append(node('p', '이 기기에 저장된 연습 기록이 없습니다.', 'deep-note'));
+      if (!saved.notice) host.append(node('p', '저장된 연습 기록이 없습니다.', 'deep-note'));
       return;
     }
     const rows = [
@@ -370,7 +385,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
       ['못 푼 문항 / 전체', d => `${d.missing.ratings} / ${d.total}`],
       ['비워 둔 상대 선택', d => `${d.missing.ranks}칸`]
     ];
-    host.append(node('p', '이 브라우저에 저장한 기록입니다. 최근 회차부터 표시합니다.', 'deep-note'),
+    host.append(node('p', saved.server ? '서버에 저장한 기록입니다(어느 기기에서 풀었든). 최근 5회를 최근 회차부터 표시합니다.' : '이 기기에 저장한 기록입니다. 최근 회차부터 표시합니다.', 'deep-note'),
       compare(saved.runs, '회차별 응답 비교', rows));
     if (saved.runs.length > 1) {
       host.append(details('여덟 기준의 회차별 평균 비교', () => {
@@ -382,23 +397,59 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
       }));
     }
     for (const run of saved.runs) {
-      if (run.runId !== currentId) host.append(details(`${dateOf(run)} · ${modes[run.mode]} 응답 상세`, () => report(run.data)));
+      if (run.runId !== currentId) host.append(details(`${dateOf(run)} · ${runName(run)} 응답 상세`, () => report(run.data)));
+    }
+  }
+
+  // 서버 저장(store.js의 공용 코드로 skct_deep_runs에): 어느 기기에서 풀었든 같은 기록을 보고, Claude도 서버에서 결과를 읽는다.
+  // 올리지 못해도 이 기기에는 남고, 다음에 이 페이지를 열 때 서버에 없는 이 기기 기록을 다시 올린다
+  const DEEP_API = REST + '/skct_deep_runs';
+  const toRow = run => ({run_id: run.runId, completed_at: new Date(run.completedAt).toISOString(), mode: run.mode, scope: run.scope || 'all', data: run.data});
+  // 신호가 약해 요청이 멈춰도 오래 기다리지 않게 8초 제한
+  async function upload(runs) {
+    if (!runs.length) return true;
+    const r = await fetch(DEEP_API, {method: 'POST', headers: {...store.headers(), Prefer: 'resolution=ignore-duplicates,return=minimal'}, body: JSON.stringify(runs.map(toRow)), signal: AbortSignal.timeout(8000)});
+    if (r.ok) markSent(runs.map(x => x.runId));
+    return r.ok;
+  }
+  async function serverRuns() {
+    const r = await fetch(`${DEEP_API}?select=run_id,completed_at,mode,scope,data&order=completed_at.desc&limit=20`, {headers: store.headers(), signal: AbortSignal.timeout(8000)});
+    if (!r.ok) throw new Error('불러오기 실패 ' + r.status);
+    return (await r.json()).map(x => ({runId: x.run_id, completedAt: Date.parse(x.completed_at), mode: x.mode, scope: x.scope, data: x.data})).filter(validRun);
+  }
+  async function allRuns(local) {
+    try {
+      const remote = await serverRuns(), ids = new Set(remote.map(r => r.runId));
+      const missing = local.runs.filter(r => !ids.has(r.runId) && !r.sent);
+      upload(missing).catch(() => {});
+      return {runs: [...remote, ...missing].sort((a, b) => b.completedAt - a.completedAt).slice(0, 5), notice: local.notice, server: true};
+    } catch {
+      return {...local, notice: [local.notice, '서버에 연결하지 못해 이 기기 기록만 보여 줍니다.'].filter(Boolean).join(' ')};
     }
   }
 
   window.DeepResults = {
     show(host, session) {
       const data = window.DeepBank.analyze(session);
-      const run = {runId: session.runId, mode: session.mode, completedAt: session.completedAt, data};
+      const run = {runId: session.runId, mode: session.mode, scope: session.scope || 'all', completedAt: session.completedAt, data};
       const historyHost = node('section');
       host.replaceChildren(report(data), historyHost);
-      const save = () => drawHistory(historyHost, saveRun(run), run.runId);
-      // 여러 탭이 동시에 끝나도 이전 기록을 읽고 최근 5회를 쓰는 작업이 겹치지 않게 한다.
-      if (navigator.locks) return navigator.locks.request(historyKey, save).catch(save);
-      save();
+      const save = () => { const local = saveRun(run); drawHistory(historyHost, local, run.runId); return local; };
+      // 서버에 올리고 합친 목록을 다시 그린다. 이 기기 저장(잠금 안)이 끝난 뒤에 한다
+      const sync = async local => {
+        const sent = await upload([run]).catch(() => false);
+        const merged = await allRuns(loadRuns());
+        if (!sent) merged.notice = [merged.notice, '이번 결과를 서버에 올리지 못했습니다. 이 기기에는 저장했고 다음에 이 페이지를 열 때 다시 올립니다.'].filter(Boolean).join(' ');
+        drawHistory(historyHost, merged, run.runId);
+      };
+      // 여러 탭이 동시에 끝나도 이전 기록을 읽고 최근 5회를 쓰는 작업이 겹치지 않게 한다. 잠금은 이 기기 저장에만 잡는다(네트워크를 기다리며 다른 탭의 저장을 막지 않게)
+      const locked = navigator.locks ? navigator.locks.request(historyKey, save).catch(save) : Promise.resolve(save());
+      return locked.then(sync);
     },
-    history(host) {
-      drawHistory(host, loadRuns());
+    async history(host) {
+      const local = loadRuns();
+      drawHistory(host, local);
+      drawHistory(host, await allRuns(local));
     }
   };
 })();
@@ -454,6 +505,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     const prep = phase.startsWith('prep');
     deadline = at + (prep ? prepMs : modes[session.mode].seconds[partNumber()-1] * 1000);
     $('phase-label').textContent = modes[session.mode].name + ' · Part ' + partNumber() + (prep ? ' 준비' : '');
+    $('end-early').hidden = phase === 'prep1';
     if (prep) renderPreparation(); else renderPage();
     topFocus('phase-heading');
   }
@@ -465,7 +517,7 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
     clearInterval(ticker);
     session.completedAt = at;
     showView('completed');
-    $('result-caption').textContent = modes[session.mode].name + ' · Part 1 ' + session.plan.p1.length + '묶음 / Part 2 ' + session.plan.p2.length + '문항';
+    $('result-caption').textContent = modes[session.mode].name + ' · Part 1 ' + session.plan.p1.length + '묶음 / Part 2 ' + session.plan.p2.length + '문항' + (session.scope === 'part' ? ' (중간에 끝냄)' : '');
     Promise.resolve(DeepResults.show($('results'), session)).then(() => {
       if (phase === 'home') DeepResults.history($('home-history'));
     });
@@ -607,6 +659,30 @@ table.deep-compare { display: table; border-collapse: collapse; margin: 0; width
       topFocus('phase-heading');
     }
     tick(now);
+  });
+  // 중간에 끝내기: 지금까지 화면에 나온 부분만 남겨 결과를 낸다(예: Part 1만 풀고 끝내기). 아무것도 고르지 않은 현재 화면은 뺀다
+  $('end-early').addEventListener('click', () => {
+    const now = Date.now();
+    if (tick(now) || !['p1', 'prep2', 'p2'].includes(phase)) return;
+    const p = session.plan;
+    let n1 = p.p1.length, n2 = 0;
+    if (phase === 'p1') {
+      const r = session.ranks[page], touched = session.ratings1[page].some(x => x !== null) || r.far !== null || r.near !== null;
+      if (touched) rememberGroup(now);
+      n1 = page + (touched ? 1 : 0);
+    } else if (phase === 'p2') {
+      const [from, end] = range2();
+      n2 = session.ratings2.slice(from, end).some(x => x !== null) ? end : from;
+    }
+    if (!n1 && !n2) return alert('아직 푼 문항이 없습니다.');
+    if (!confirm(`여기서 끝내고 지금까지 푼 부분(Part 1 ${n1}묶음${n2 ? `, Part 2 ${n2}문항` : ''})으로 결과를 볼까요?`)) return;
+    session.plan = {...p, p1: p.p1.slice(0, n1), p2: p.p2.slice(0, n2)};
+    session.ratings1 = session.ratings1.slice(0, n1);
+    session.ranks = session.ranks.slice(0, n1);
+    session.groupSeconds = session.groupSeconds.slice(0, n1);
+    session.ratings2 = session.ratings2.slice(0, n2);
+    session.scope = 'part';
+    finish(now);
   });
   $('intro').addEventListener('click', e => {
     const b = e.target.closest('button[data-mode]');

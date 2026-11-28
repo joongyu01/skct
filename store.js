@@ -139,6 +139,10 @@ const store = {
     await this._chain; // 받아 오는 중에 지우면 지운 기록이 응답과 함께 되살아난다
     const r = await fetch(`${API}?id=gt.0`, { method: 'DELETE', headers: this.headers() });
     if (!r.ok) throw new Error('지우기 실패 ' + r.status);
+    // 심층검사 연습 결과(deep.html)도 서버와 이 기기에서 지운다
+    const d = await fetch(`${REST}/skct_deep_runs?run_id=not.is.null`, { method: 'DELETE', headers: this.headers() });
+    if (!d.ok) throw new Error('심층검사 기록 지우기 실패 ' + d.status);
+    try { localStorage.removeItem('skct-deep-results-v1'); } catch {}
     this.rows = []; this.lastId = 0; this.outbox = [];
     this.save(); this.index();
   },
