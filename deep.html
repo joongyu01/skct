@@ -1,0 +1,630 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>심층검사 연습 · SKCT</title>
+  <script>try { if (!JSON.parse(localStorage.getItem('skct-token'))) location.replace('./'); } catch { location.replace('./'); }</script>
+  <meta http-equiv="Content-Security-Policy" content="connect-src 'none'; form-action 'none'">
+  <style>
+    :root { color-scheme: light; background: #fff; color: #17191c; -webkit-text-size-adjust: 100%; }
+    * { box-sizing: border-box; }
+    body { margin: 0 auto; max-width: 852px; padding: 0 max(16px, env(safe-area-inset-right)) max(36px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); font: 18px/1.6 system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; word-break: keep-all; overflow-wrap: anywhere; }
+    h1,h2,h3,p { margin: 0; }
+    h1 { font-size: clamp(1.6rem, 5vw, 2.15rem); line-height: 1.25; letter-spacing: -.045em; }
+    h2 { font-size: 1.35rem; line-height: 1.4; } h3 { font-size: 1.12rem; }
+    a { color: #334661; text-underline-offset: 3px; }
+    button, input { font: inherit; } button, label { touch-action: manipulation; }
+    button { color: inherit; cursor: pointer; }
+    button:focus-visible, a:focus-visible, summary:focus-visible, input:focus-visible + span { outline: 3px solid #275fac; outline-offset: 2px; }
+    h1:focus, h2:focus { outline: none; }
+    [hidden] { display: none !important; }
+    .site-head, .test-bar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px 12px; min-height: 58px; padding: 8px 0; border-bottom: 2px solid #333; }
+    .site-head a:first-child { color: inherit; text-decoration: none; font-weight: 700; }
+    .site-head a:last-child { font-size: .9em; }
+    .test-bar { position: sticky; top: 0; z-index: 3; background: #fff; font-size: .93em; }
+    .test-bar b { font-weight: 700; }
+    #clock { font-variant-numeric: tabular-nums; font-weight: 750; font-size: 1.15em; }
+    .lead { margin: 30px 0 22px; }
+    .lead p, .description { margin-top: 8px; color: #4b5057; }
+    .mode-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin: 14px 0 24px; }
+    .mode { display: flex; flex-direction: column; gap: 14px; border: 1px solid #bdc1c6; border-radius: 9px; padding: 20px; }
+    .mode h3 { font-size: 1.25rem; }
+    .mode dl { margin: 0; font-size: .93em; }
+    .mode dl div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; }
+    .mode dd { margin: 0; font-variant-numeric: tabular-nums; }
+    .button { min-height: 44px; padding: 8px 17px; font-weight: 650; border: 1px solid #a8adb3; border-radius: 6px; background: #fff; }
+    .button:hover { background: #f0f2f4; }
+    .primary { background: #242a31; border-color: #242a31; color: #fff; }
+    .primary:hover { background: #404852; }
+    .button:disabled { opacity: .56; cursor: default; }
+    .note { font-size: .9em; color: #545a62; }
+    .guide-note { border-block: 1px solid #d2d5d9; padding: 12px 0; margin: 20px 0 26px; }
+    summary { cursor: pointer; font-weight: 650; }
+    .guide-note ul { padding-left: 1.25em; margin: 10px 0 0; }
+    .guide-note li + li { margin-top: 5px; }
+    .prep { border: 1px solid #c6c9cd; border-radius: 8px; padding: 18px 20px; }
+    .prep p + p { margin-top: 10px; }
+    .prep + button { margin-top: 18px; }
+    .phase-heading { margin: 21px 0 15px; }
+    .phase-heading h1 { font-size: 1.5rem; }
+    .phase-heading p { margin-top: 4px; font-size: .95em; }
+    .question-list { --cols: minmax(0, 1fr) minmax(316px, 42%) minmax(130px, 16%); border: 1px solid #bdc2c8; border-radius: 8px; }
+    .question-list.singles { --cols: minmax(0, 1fr) minmax(360px, 51%); }
+    .matrix-head, .question-row { display: grid; grid-template-columns: var(--cols); }
+    .matrix-head { background: #f3f4f5; border-radius: 8px 8px 0 0; }
+    .matrix-head > div { padding: 6px 3px; align-content: center; text-align: center; font-size: .87em; font-weight: 700; }
+    .matrix-head > div + div { border-left: 1px solid #d2d5d9; }
+    .matrix-head small { display: block; font-size: 12px; line-height: 1.35; font-weight: 550; word-break: keep-all; }
+    .ticks, .ratings { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .ticks { margin-top: 4px; }
+    .pair-labels, .ranks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pair-labels { margin-top: 4px; }
+    .question-row { border-top: 1px solid #d2d5d9; padding: 9px 0; align-items: center; }
+    .statement { padding: 0 10px; display: flex; align-items: baseline; gap: 8px; line-height: 1.5; }
+    .row-num { font-size: .83em; color: #535a62; min-width: 1.25em; font-variant-numeric: tabular-nums; }
+    .ratings, .ranks { padding: 0 2px; gap: 3px; }
+    .choice { display: flex; position: relative; }
+    .choice input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+    .choice > span, .rank-button { display: flex; min-height: 44px; width: 100%; flex-direction: column; justify-content: center; align-items: center; border: 1px solid #b9bec4; border-radius: 4px; font-variant-numeric: tabular-nums; background: #fff; cursor: pointer; }
+    .choice input:checked + span, .rank-button[aria-pressed="true"] { background: #283139; border-color: #283139; color: #fff; font-weight: 700; }
+    .rank-button { padding: 2px; font-size: .88em; white-space: nowrap; }
+    .mobile-label, .mobile-group { display: none; }
+    .actions { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px 14px; margin: 16px 0 10px; }
+    .warn { color: #794214; font-size: .94em; flex: 1 1 220px; }
+    .actions button { min-width: 95px; }
+    #results-back { margin: 20px 0; }
+    .sr-only { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+    @media (max-width: 660px) {
+      body { font-size: 17px; padding-inline: max(12px, env(safe-area-inset-left)) max(12px, env(safe-area-inset-right)); }
+      .lead { margin: 21px 0 16px; }
+      .question-list, .question-list.singles { border: 0; }
+      .matrix-head { display: none; }
+      .question-row { display: block; padding: 12px; border: 1px solid #c3c7cc; border-radius: 7px; margin-bottom: 10px; }
+      .statement { padding: 0; font-weight: 600; }
+      .ratings, .ranks { padding: 0; gap: 4px; }
+      .ranks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .mobile-group { display: block; font-size: 12px; font-weight: 650; color: #555c65; margin: 8px 0 3px; }
+      .choice > span { min-height: 72px; padding: 3px 1px; }
+      .mobile-label { display: block; font-size: 12px; line-height: 1.25; font-weight: 450; word-break: keep-all; }
+      .choice { min-width: 0; text-align: center; }
+    }
+    @media (max-width: 480px) {
+      .mode-list { grid-template-columns: 1fr; gap: 10px; }
+      .mode { padding: 14px; gap: 8px; }
+    }
+    .deep-note { color: #4a4a4a; font-size: .9em; }
+.deep-report h3 { margin: 1.4em 0 .45em; }
+.deep-metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 165px), 1fr)); gap: 8px; margin: 12px 0; }
+.deep-metrics > div { border: 1px solid #ccc; border-radius: 8px; padding: 8px 12px; }
+.deep-metrics dt { color: #494949; font-size: .85em; }
+.deep-metrics dd { margin: 2px 0 0; font-weight: 650; font-variant-numeric: tabular-nums; }
+.deep-detail { border-bottom: 1px solid #ccc; margin: 0; }
+.deep-detail > summary, .deep-zero { padding: 11px 2px; margin: 0; }
+.deep-detail > summary { cursor: pointer; touch-action: manipulation; }
+.deep-detail > summary:focus-visible, .deep-scroll:focus-visible { outline: 2px solid #1d4ed8; outline-offset: 2px; }
+.deep-checks { padding-left: 1.6em; }
+.deep-checks li { border-top: 1px solid #ddd; padding: 6px 0; }
+.deep-checks li p { margin: 4px 0 8px; }
+.deep-zero { border-bottom: 1px solid #ddd; }
+.deep-axis { margin: .6em 0 1em; padding: 0 3px; }
+.deep-axis-name, .deep-ends { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.deep-axis-name > span, .deep-ends { font-size: .83em; color: #4a4a4a; }
+.deep-ends > :last-child { text-align: right; }
+.deep-axis-track { position: relative; height: 7px; border-radius: 9px; margin: 6px 4px; background: #e2e2e2; }
+.deep-axis-track::before { content: ""; position: absolute; top: -2px; bottom: -2px; left: 50%; border-left: 1px solid #777; }
+.deep-axis-track > span { position: absolute; top: 50%; width: 13px; height: 13px; border: 1px solid #fff; box-sizing: border-box; border-radius: 50%; background: #222; transform: translate(-50%, -50%); }
+.deep-scroll { width: 100%; max-width: 100%; overflow-x: auto; margin: 8px 0 16px; }
+table.deep-compare { display: table; border-collapse: collapse; margin: 0; width: auto; min-width: min(100%, 340px); max-width: none; font-size: .86em; font-variant-numeric: tabular-nums; }
+.deep-compare caption { text-align: left; font-weight: 650; }
+.deep-compare th, .deep-compare td { border: 1px solid #bbb; padding: 6px 9px; text-align: center; vertical-align: middle; white-space: nowrap; }
+.deep-compare tbody th { text-align: left; font-weight: 500; white-space: normal; min-width: 6.5em; }
+.deep-compare thead th { background: #f6f6f6; }
+.deep-compare th:first-child { position: sticky; left: 0; background: #f6f6f6; }
+@media (max-width: 500px) {
+  .deep-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .deep-compare th, .deep-compare td { padding: 5px 7px; }
+  .deep-axis-name { flex-wrap: wrap; gap: 0 8px; }
+}
+  </style>
+</head>
+<body>
+  <main>
+    <div id="intro">
+      <nav class="site-head" aria-label="사이트"><a href="./">← SKCT 연습</a><a href="guide.html#deep">심층검사 가이드</a></nav>
+      <header class="lead"><h1 tabindex="-1" id="intro-heading">심층검사 연습</h1><p>두 파트를 풀고, 같은 문장에 내 답이 어떻게 달라졌는지 확인하세요.</p></header>
+      <h2>연습 분량</h2>
+      <div class="mode-list">
+        <section class="mode"><h3>짧게</h3><dl><div><dt>Part 1</dt><dd>15묶음 · 8분 30초</dd></div><div><dt>Part 2</dt><dd>30문항 · 5분</dd></div></dl><button class="button primary" type="button" data-mode="short">짧게 시작</button></section>
+        <section class="mode"><h3>실전 분량</h3><dl><div><dt>Part 1</dt><dd>80묶음 · 45분</dd></div><div><dt>Part 2</dt><dd>150문항 · 25분</dd></div></dl><button class="button" type="button" data-mode="full">실전 분량 시작</button></section>
+      </div>
+      <details class="guide-note"><summary>응답 방법과 추정 범위</summary><ul>
+        <li>Part 1은 세 문장을 각각 1~6으로 평정하고 서로 다른 두 문장에 ‘멀다’와 ‘가깝다’를 표시합니다. 세 평정에 모두 같은 숫자를 골라도 됩니다. Part 2는 평정만 합니다.</li>
+        <li>문항과 결과 지표는 연습용입니다. 완료한 결과는 이 브라우저에만 최근 5회까지 저장합니다.</li>
+        <li><b>추정</b> · 각 파트 앞의 1분 준비, 한 화면 분량(Part 1 한 묶음, Part 2 다섯 문항), 타이머 위치·전환 방식, 미응답 안내 후 이동은 연습 화면의 설정입니다.</li>
+        <li><b>추정</b> · Part 2도 Part 1과 같은 여섯 칸 문구로 표시합니다. 공식 안내에서 칸마다 문구를 확인한 화면은 Part 1입니다.</li>
+        <li><b>추정</b> · 응답2의 같은 칸을 다시 누르면 해제되고 같은 문장의 반대 칸을 누르면 선택이 옮겨집니다. 반복 간격·횟수, Part 2의 부정적 문장 비중과 복기 기준도 연습용입니다.</li>
+      </ul></details>
+      <div id="home-history"></div>
+    </div>
+    <div id="active" hidden>
+      <div class="test-bar"><b id="phase-label"></b><span>남은 시간 <time id="clock" role="timer"></time></span></div>
+      <div id="panel"></div>
+    </div>
+    <section id="completed" hidden><div class="lead"><h1 tabindex="-1" id="result-heading">연습 결과</h1><p id="result-caption"></p></div><div id="results"></div><button class="button" type="button" id="results-back">연습 처음으로</button></section>
+    <noscript>이 연습을 사용하려면 브라우저에서 자바스크립트를 켜세요.</noscript>
+  </main>
+  <script src="deep-items.js?v=1"></script>
+  <script>
+(() => {
+  'use strict';
+  const historyKey = 'skct-deep-results-v1';
+  const modes = {short: '짧게', full: '실전 분량'};
+  const dateFormat = new Intl.DateTimeFormat('ko-KR', {timeZone: 'Asia/Seoul', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23'});
+  const dateOf = run => dateFormat.format(run.completedAt);
+  const fraction = (count, total) => total ? `${count} / ${total}` : '비교 대상 없음';
+  const averageTime = value => Number.isFinite(value) ? `${value.toFixed(1)}초` : '기록 없음';
+  const endsPercent = ends => Number.isFinite(ends.ratio) ? `${(ends.ratio * 100).toFixed(1)}%` : '응답 없음';
+
+  function node(tag, text, className) {
+    const el = document.createElement(tag);
+    if (text != null) el.textContent = text;
+    if (className) el.className = className;
+    return el;
+  }
+
+  function validRun(run) {
+    if (!run || typeof run.mode !== 'string' || !Object.hasOwn(modes, run.mode) || typeof run.runId !== 'string'
+      || typeof run.completedAt !== 'number' || !Number.isFinite(new Date(run.completedAt).getTime())) return false;
+    const d = run.data;
+    const count = x => Number.isInteger(x) && x >= 0;
+    const value = x => x && typeof x.text === 'string' && Number.isInteger(x.value) && x.value >= 1 && x.value <= 6
+      && count(x.index) && (x.part === 2 || (x.part === 1 && count(x.group) && ['A', 'B', 'C'].includes(x.row)));
+    const pair = x => x && value(x.first) && value(x.last);
+    return d && [d.same, d.reverse, d.lateFlips].every(a => Array.isArray(a) && a.every(pair))
+      && Array.isArray(d.rank) && d.rank.every(x => x && count(x.group) && count(x.high) && count(x.low)
+        && value(x.near) && value(x.far) && Array.isArray(x.items) && x.items.every(value))
+      && Array.isArray(d.axes) && d.axes.every(x => x && [x.id, x.name, x.low, x.high].every(s => typeof s === 'string')
+        && count(x.count) && (x.count ? Number.isFinite(x.mean) : x.mean === null))
+      && [d.total, d.answered, d.halfStart, d.compared?.same, d.compared?.reverse, d.compared?.rank, d.lie?.answered,
+        d.lie?.high, d.ends?.answered, d.ends?.count, d.time?.groups, d.missing?.ratings, d.missing?.ranks,
+        d.missing?.ratings1, d.missing?.ratings2, d.missing?.near, d.missing?.far].every(count);
+  }
+
+  function loadRuns() {
+    try {
+      const raw = localStorage.getItem(historyKey);
+      if (!raw) return {runs: []};
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return {runs: [], notice: '저장된 기록의 형식을 읽을 수 없습니다.'};
+      const valid = parsed.filter(validRun);
+      const runs = valid.sort((a, b) => b.completedAt - a.completedAt).slice(0, 5);
+      return {runs, notice: valid.length < parsed.length ? '형식이 손상된 기록은 비교에서 제외했습니다.' : ''};
+    } catch {
+      return {runs: [], notice: '이 브라우저에서 이전 기록을 읽을 수 없습니다.'};
+    }
+  }
+
+  function saveRun(run) {
+    const saved = loadRuns();
+    const runs = [run, ...saved.runs.filter(previous => previous.runId !== run.runId)]
+      .sort((a, b) => b.completedAt - a.completedAt).slice(0, 5);
+    try {
+      localStorage.setItem(historyKey, JSON.stringify(runs));
+      return {runs, notice: saved.notice};
+    } catch {
+      return {runs: saved.runs, notice: '브라우저 저장소에 이번 결과를 저장할 수 없습니다. 현재 화면에서 결과를 확인할 수 있습니다.'};
+    }
+  }
+
+  function details(label, content) {
+    const box = node('details', null, 'deep-detail');
+    box.append(node('summary', label));
+    box.addEventListener('toggle', function fill() {
+      if (!box.open) return;
+      box.removeEventListener('toggle', fill);
+      box.append(content());
+    });
+    return box;
+  }
+
+  function locationOf(x) {
+    return x.part === 1 ? `Part 1 · ${x.group}묶음 ${x.row}` : `Part 2 · ${x.index}번`;
+  }
+
+  function occurrences(pairs) {
+    const list = node('ol', null, 'deep-checks');
+    for (const {first, last} of pairs) {
+      const li = node('li');
+      for (const x of [first, last]) {
+        const p = node('p');
+        p.append(node('strong', `${locationOf(x)} · ${x.value}점`), document.createElement('br'), document.createTextNode(x.text));
+        li.append(p);
+      }
+      list.append(li);
+    }
+    return list;
+  }
+
+  function relativePicks(groups) {
+    const list = node('ul', null, 'deep-checks');
+    for (const group of groups) {
+      const li = node('li');
+      li.append(node('strong', `Part 1 · ${group.group}묶음`));
+      for (const item of group.items) {
+        const chosen = item.row === group.near.row ? ' · 가깝다' : item.row === group.far.row ? ' · 멀다' : '';
+        li.append(node('p', `${item.row} · ${item.value}점${chosen} — ${item.text}`));
+      }
+      if (group.nearOff) li.append(node('p', `가깝다로 고른 값은 ${group.near.value}점이고, 이 묶음의 최고 평정은 ${group.high}점입니다.`, 'deep-note'));
+      if (group.farOff) li.append(node('p', `멀다로 고른 값은 ${group.far.value}점이고, 이 묶음의 최저 평정은 ${group.low}점입니다.`, 'deep-note'));
+      list.append(li);
+    }
+    return list;
+  }
+
+  function checkGroup(parent, title, hint, entries, makeList, comparable) {
+    if (entries.length) {
+      parent.append(details(`${title} · ${entries.length}건`, () => {
+        const body = node('div');
+        body.append(node('p', hint, 'deep-note'), makeList(entries));
+        return body;
+      }));
+    } else {
+      parent.append(node('p', `${title} · ${comparable ? '0건' : '비교 대상 없음'}`, 'deep-zero'));
+    }
+  }
+
+  function axes(data) {
+    const box = node('section', null, 'deep-axes');
+    box.append(node('h3', '여덟 기준별 응답 방향'), node('p', '역문항은 방향을 맞춰 평균을 냈습니다. 가운데는 3.5이고, 양쪽 끝은 아래 표시된 경향에 해당합니다.', 'deep-note'));
+    for (const axis of data.axes) {
+      const line = node('div', null, 'deep-axis');
+      const name = node('div', null, 'deep-axis-name');
+      name.append(node('strong', axis.name), node('span', axis.count ? `${axis.mean.toFixed(1)} / 6 · ${axis.count}회 응답` : '응답 없음'));
+      line.append(name);
+      const track = node('div', null, 'deep-axis-track');
+      track.setAttribute('aria-hidden', 'true');
+      if (axis.count && Number.isFinite(axis.mean)) {
+        const mark = node('span');
+        mark.style.left = `${Math.max(0, Math.min(100, (axis.mean - 1) * 20))}%`;
+        track.append(mark);
+      }
+      const labels = node('div', null, 'deep-ends');
+      labels.append(node('span', axis.low), node('span', axis.high));
+      line.append(track, labels);
+      box.append(line);
+    }
+    return box;
+  }
+
+  function report(data) {
+    const body = node('div', null, 'deep-report');
+    body.append(node('p', '추정 · 아래 비교는 연습 문항에서 직접 고른 값을 되짚어 보는 기준입니다.', 'deep-note'));
+    const metrics = node('dl', null, 'deep-metrics');
+    for (const [label, amount] of [
+      ['문장 평정', `${data.answered} / ${data.total}`],
+      ['못 푼 문항', `${data.missing.ratings}개`],
+      ['양끝 응답 비율 (1·6점, 참고)', `${endsPercent(data.ends)} · ${data.ends.count}회`],
+      ['거짓말 척도 연습 문항에 5·6점', data.lie.answered ? `${data.lie.high} / ${data.lie.answered}회` : '응답 없음'],
+      ['Part 1 묶음당 평균', averageTime(data.time.average)],
+      ['평균 시간에 포함된 묶음', `${data.time.groups}묶음`]
+    ]) {
+      const group = node('div');
+      group.append(node('dt', label), node('dd', amount));
+      metrics.append(group);
+    }
+    body.append(metrics, node('p', `못 푼 평정은 Part 1 ${data.missing.ratings1}개, Part 2 ${data.missing.ratings2}개입니다. Part 1 상대 선택에서 비어 있는 칸은 가깝다 ${data.missing.near}개, 멀다 ${data.missing.far}개입니다.`, 'deep-note'));
+    body.append(node('h3', '위치와 응답 확인'));
+    checkGroup(body, '같은 문장의 평정이 3칸 이상 달라짐', `반복 응답한 ${data.compared.same}개 문장을 비교했습니다. 문장별로 차이가 크게 나타난 응답을 한 쌍씩 표시합니다.`, data.same, occurrences, data.compared.same);
+    checkGroup(body, '반대 뜻 문장에 같은 쪽으로 강하게 응답', `반대 뜻으로 짝지은 ${data.compared.reverse}쌍을 비교했습니다. 두 문장에 모두 1·2점 또는 모두 5·6점을 준 경우입니다.`, data.reverse, occurrences, data.compared.reverse);
+    checkGroup(body, '같은 문장의 후반 응답이 1점 ↔ 6점으로 바뀜', `파트를 이어 센 전체 문장의 ${data.halfStart}번째부터가 후반입니다. 값이 달라진 이유는 이 기록만으로 알 수 없습니다.`, data.lateFlips, occurrences, data.compared.same);
+    checkGroup(body, 'Part 1 상대 선택 참고(공식 규칙 미확인)', `모두 답한 ${data.compared.rank}묶음에서 가깝다가 최고 평정과 다르거나 멀다가 최저 평정과 다른 경우입니다. 최고·최저가 동점인 문장끼리는 어느 쪽을 골라도 같습니다.`, data.rank, relativePicks, data.compared.rank);
+    body.append(axes(data));
+    return body;
+  }
+
+  function compare(runs, title, rows) {
+    const wrap = node('div', null, 'deep-scroll');
+    wrap.setAttribute('role', 'region');
+    wrap.setAttribute('aria-label', title);
+    wrap.tabIndex = 0;
+    const table = node('table', null, 'deep-compare');
+    table.append(node('caption', title));
+    const head = table.createTHead().insertRow();
+    const label = node('th', '항목');
+    label.scope = 'col';
+    head.append(label);
+    for (const run of runs) {
+      const cell = node('th', modes[run.mode]);
+      cell.scope = 'col';
+      cell.append(document.createElement('br'), node('small', dateOf(run)));
+      head.append(cell);
+    }
+    const tbody = table.createTBody();
+    for (const [name, read] of rows) {
+      const tr = tbody.insertRow();
+      const cell = node('th', name);
+      cell.scope = 'row';
+      tr.append(cell);
+      for (const run of runs) tr.append(node('td', read(run.data)));
+    }
+    wrap.append(table);
+    return wrap;
+  }
+
+  function drawHistory(host, saved, currentId) {
+    host.replaceChildren(node('h2', '최근 5회 비교'));
+    if (saved.notice) host.append(node('p', saved.notice, 'deep-note'));
+    if (!saved.runs.length) {
+      if (!saved.notice) host.append(node('p', '이 기기에 저장된 연습 기록이 없습니다.', 'deep-note'));
+      return;
+    }
+    const rows = [
+      ['같은 문장 3칸 이상 / 비교 문장', d => fraction(d.same.length, d.compared.same)],
+      ['역문항 같은 쪽 / 비교 쌍', d => fraction(d.reverse.length, d.compared.reverse)],
+      ['후반 1 ↔ 6', d => `${d.lateFlips.length}건`],
+      ['상대 선택 참고 / 완답 묶음', d => fraction(d.rank.length, d.compared.rank)],
+      ['거짓말 척도 5·6점 / 응답', d => d.lie.answered ? fraction(d.lie.high, d.lie.answered) : '응답 없음'],
+      ['양끝 응답 비율', d => endsPercent(d.ends)],
+      ['묶음당 평균', d => averageTime(d.time.average)],
+      ['못 푼 문항 / 전체', d => `${d.missing.ratings} / ${d.total}`],
+      ['비워 둔 상대 선택', d => `${d.missing.ranks}칸`]
+    ];
+    host.append(node('p', '이 브라우저에 저장한 기록입니다. 최근 회차부터 표시합니다.', 'deep-note'),
+      compare(saved.runs, '회차별 응답 비교', rows));
+    if (saved.runs.length > 1) {
+      host.append(details('여덟 기준의 회차별 평균 비교', () => {
+        const axisRows = saved.runs[0].data.axes.map(axis => [axis.name, d => {
+          const entry = d.axes.find(x => x.id === axis.id);
+          return entry && Number.isFinite(entry.mean) ? entry.mean.toFixed(1) : '응답 없음';
+        }]);
+        return compare(saved.runs, '방향을 맞춘 평균 · 1~6점', axisRows);
+      }));
+    }
+    for (const run of saved.runs) {
+      if (run.runId !== currentId) host.append(details(`${dateOf(run)} · ${modes[run.mode]} 응답 상세`, () => report(run.data)));
+    }
+  }
+
+  window.DeepResults = {
+    show(host, session) {
+      const data = window.DeepBank.analyze(session);
+      const run = {runId: session.runId, mode: session.mode, completedAt: session.completedAt, data};
+      const historyHost = node('section');
+      host.replaceChildren(report(data), historyHost);
+      const save = () => drawHistory(historyHost, saveRun(run), run.runId);
+      // 여러 탭이 동시에 끝나도 이전 기록을 읽고 최근 5회를 쓰는 작업이 겹치지 않게 한다.
+      if (navigator.locks) return navigator.locks.request(historyKey, save).catch(save);
+      save();
+    },
+    history(host) {
+      drawHistory(host, loadRuns());
+    }
+  };
+})();
+  </script>
+  <script>
+(() => {
+  'use strict';
+  const $ = id => document.getElementById(id);
+  // 구성은 두 조사에서 일치한다(Claude F01, F03~07, Codex §1). 척도와 멀다→가깝다 열은 11/25 공식 안내 인쇄 10쪽을 따른다.
+  // 추정: Part 2에서 칸마다 표시하는 문구도 Part 1과 같다고 두었다.
+  const scale = ['전혀 그렇지 않다', '대체로 그렇지 않다', '약간 그렇지 않다', '약간 그렇다', '대체로 그렇다', '매우 그렇다'];
+  const modes = {short: {name: '짧게', seconds: [510, 300]}, full: {name: '실전 분량', seconds: [2700, 1500]}};
+  // 추정: 한 페이지에 Part 1 한 묶음, Part 2 다섯 문장을 배치한다. 양쪽 조사 모두 실제 화면당 수를 확인하지 못했다.
+  const perPage2 = 5;
+  const prepMs = 60000;
+  const panel = $('panel');
+  let session, phase = 'home', page = 0, deadline = 0, openedAt = 0;
+  let ticker, lockedUntil = 0, warned = false;
+
+  function safeText(value) {
+    return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[c]));
+  }
+  function showView(which) {
+    for (const id of ['intro', 'active', 'completed']) $(id).hidden = id !== which;
+  }
+  function topFocus(id) {
+    window.scrollTo(0, 0);
+    $(id).focus({preventScroll:true});
+  }
+  function start(mode) {
+    if (phase !== 'home') return;
+    const plan = DeepBank.makePlan(mode);
+    session = {
+      mode, plan, runId: globalThis.crypto?.randomUUID?.() || (Date.now().toString(36) + Math.random().toString(36).slice(2)),
+      ratings1: plan.p1.map(() => [null, null, null]), ranks: plan.p1.map(() => ({far:null, near:null})),
+      ratings2: plan.p2.map(() => null), groupSeconds: plan.p1.map(() => null)
+    };
+    showView('active');
+    const now = Date.now();
+    lockedUntil = 0;
+    enter('prep1', now);
+    tick(now);
+    clearInterval(ticker);
+    ticker = setInterval(() => tick(Date.now()), 150);
+  }
+  function partNumber() { return phase === 'p1' || phase === 'prep1' ? 1 : 2; }
+  function enter(next, at) {
+    phase = next;
+    page = 0;
+    warned = false;
+    openedAt = at;
+    // 추정: 익명 전임직 후기의 준비 화면을 1분으로 재현한다. 준비 시간은 풀이 시간과 별도다.
+    const prep = phase.startsWith('prep');
+    deadline = at + (prep ? prepMs : modes[session.mode].seconds[partNumber()-1] * 1000);
+    $('phase-label').textContent = modes[session.mode].name + ' · Part ' + partNumber() + (prep ? ' 준비' : '');
+    if (prep) renderPreparation(); else renderPage();
+    topFocus('phase-heading');
+  }
+  function rememberGroup(at) {
+    if (phase === 'p1') session.groupSeconds[page] = Math.max(0, Math.min(at, deadline) - openedAt) / 1000;
+  }
+  function finish(at) {
+    phase = 'done';
+    clearInterval(ticker);
+    session.completedAt = at;
+    showView('completed');
+    $('result-caption').textContent = modes[session.mode].name + ' · Part 1 ' + session.plan.p1.length + '묶음 / Part 2 ' + session.plan.p2.length + '문항';
+    Promise.resolve(DeepResults.show($('results'), session)).then(() => {
+      if (phase === 'home') DeepResults.history($('home-history'));
+    });
+    topFocus('result-heading');
+  }
+  function advancePhase(at) {
+    if (phase === 'prep1') enter('p1', at);
+    else if (phase === 'p1') { rememberGroup(at); enter('prep2', at); }
+    else if (phase === 'prep2') enter('p2', at);
+    else if (phase === 'p2') finish(at);
+  }
+  function tick(now) {
+    if (phase === 'home' || phase === 'done') return false;
+    let advanced = false;
+    // 추정: 파트 종료 즉시 다음 준비/결과로 전환한다. 백그라운드에서 간격 타이머가 멈춰도 원래 마감 시각을 기준으로 계산한다.
+    while (phase !== 'done' && now >= deadline) {
+      advancePhase(deadline);
+      advanced = true;
+    }
+    if (phase === 'done') return advanced;
+    if (advanced) lockedUntil = now + 800;
+    const left = Math.max(0, Math.ceil((deadline - now) / 1000));
+    const value = String(Math.floor(left/60)).padStart(2, '0') + ':' + String(left%60).padStart(2, '0');
+    // 추정: 상단 분:초 형식은 사전점검 공통 안내를 참고한 심층 연습 표시다.
+    if ($('clock').textContent !== value) $('clock').textContent = value;
+    const button = panel.querySelector('[data-action]');
+    if (button) button.disabled = now < lockedUntil;
+    return advanced;
+  }
+  function renderPreparation() {
+    const first = partNumber() === 1;
+    const intro = first
+      ? '세 문장마다 자신과 맞는 정도를 1~6에서 고르세요. 이어서 서로 다른 두 문장에 ‘멀다’와 ‘가깝다’를 하나씩 표시하세요.'
+      : '각 문장을 읽고 자신과 맞는 정도를 한 칸씩 고르세요. 이번 파트에는 ‘멀다’와 ‘가깝다’ 선택이 없습니다.';
+    panel.innerHTML = '<header class="lead"><h1 id="phase-heading" tabindex="-1">Part ' + partNumber() + ' 준비</h1><p>' +
+      (first ? session.plan.p1.length + '묶음' : session.plan.p2.length + '문항') + ' · ' +
+      (first ? (session.mode === 'short' ? '8분 30초' : '45분') : (session.mode === 'short' ? '5분' : '25분')) + '</p></header>' +
+      '<div class="prep"><p>' + intro + '</p><p><b>1</b> 전혀 그렇지 않다 → <b>6</b> 매우 그렇다</p>' +
+      '<p class="note">추정 · 준비 1분이 지나면 풀이가 시작됩니다. 지금 시작해도 풀이 시간은 같습니다.</p></div>' +
+      '<button type="button" class="button primary" data-action="ready">바로 시작</button>';
+  }
+  function range2() {
+    const from = page * perPage2;
+    return [from, Math.min(from + perPage2, session.plan.p2.length)];
+  }
+  function pageComplete() {
+    if (phase === 'p1') {
+      const r = session.ranks[page];
+      return session.ratings1[page].every(x => x !== null) && r.far !== null && r.near !== null;
+    }
+    const [start, end] = range2();
+    return session.ratings2.slice(start, end).every(x => x !== null);
+  }
+  function finalPage() {
+    return phase === 'p1' ? page + 1 === session.plan.p1.length : range2()[1] === session.plan.p2.length;
+  }
+  function nextLabel() {
+    if (warned && !pageComplete()) return '그래도 넘어가기';
+    if (finalPage()) return phase === 'p1' ? 'Part 2로' : '결과 보기';
+    return '다음';
+  }
+  function ratingControls(first, row, pos) {
+    const name = (first ? 'p1-' : 'p2-') + pos;
+    const selected = first ? session.ratings1[page][row] : session.ratings2[pos];
+    return '<div><span aria-hidden="true" class="mobile-group">' + (first ? '응답 1' : '응답') +
+      '</span><div class="ratings" role="radiogroup" aria-labelledby="q-' + pos + '">' + scale.map((label, i) =>
+        '<label class="choice"><input type="radio" name="' + name + '" value="' + (i+1) + '" data-pos="' + pos + '" data-row="' + row +
+        '" aria-label="' + (i+1) + ' ' + label + '"' + (selected === i+1 ? ' checked' : '') + '><span>' + (i+1) +
+        '<span class="mobile-label" aria-hidden="true">' + label + '</span></span></label>').join('') + '</div></div>';
+  }
+  function rankControls(row) {
+    const state = session.ranks[page];
+    return '<div><span aria-hidden="true" class="mobile-group">응답 2</span><div class="ranks">' +
+      [['far', '멀다'], ['near', '가깝다']].map(([key, label]) => '<button type="button" class="rank-button" data-rank="' + key +
+        '" data-row="' + row + '" aria-pressed="' + (state[key] === row) + '" aria-label="' + 'ABC'[row] + ' ' + label + '">' + label + '</button>').join('') + '</div></div>';
+  }
+  function renderPage() {
+    const first = phase === 'p1';
+    const [from, end] = first ? [page * 3, page * 3 + 3] : range2();
+    const items = first ? session.plan.p1[page] : session.plan.p2.slice(from, end);
+    const heading = first ? '묶음 ' + (page+1) + ' / ' + session.plan.p1.length : '문항 ' + (from+1) + '–' + end + ' / ' + session.plan.p2.length;
+    panel.innerHTML = '<header class="phase-heading"><h1 id="phase-heading" tabindex="-1">' + heading + '</h1><p>' +
+      (first ? '세 문장을 평정하고, 멀다·가깝다를 하나씩 고르세요.' : '각 문장에 1~6 중 한 칸을 고르세요.') + '</p></header>' +
+      '<div class="question-list' + (first ? '' : ' singles') + '"><div class="matrix-head" aria-hidden="true"><div>문장</div><div>' +
+      (first ? '응답 1' : '응답') + '<div class="ticks">' + scale.map(x => '<small>' + x + '</small>').join('') + '</div></div>' +
+      (first ? '<div>응답 2<div class="pair-labels"><small>멀다</small><small>가깝다</small></div></div>' : '') + '</div>' +
+      items.map((item, i) => {
+        const pos = from+i;
+        const number = first ? 'ABC'[i] : pos+1;
+        return '<div class="question-row"><p class="statement" id="q-' + pos + '"><b class="row-num">' + number + '</b><span>' +
+          safeText(item.text) + '</span></p>' + ratingControls(first, i, pos) + (first ? rankControls(i) : '') + '</div>';
+      }).join('') + '</div><div class="actions"><p class="warn" role="status" id="skip-msg"></p>' +
+      '<button type="button" class="button primary" data-action="next">' + nextLabel() + '</button></div>' +
+      '<p class="note">이전 문항으로 돌아갈 수 없습니다.</p>';
+  }
+  function refreshWarning() {
+    if (!warned) return;
+    const button = panel.querySelector('[data-action="next"]');
+    $('skip-msg').textContent = pageComplete() ? '' : '답하지 않은 문항이 있어요';
+    button.textContent = nextLabel();
+  }
+  panel.addEventListener('change', e => {
+    const radio = e.target;
+    if (!radio.matches('input[data-pos]') || tick(Date.now())) return;
+    if (phase === 'p1') session.ratings1[page][Number(radio.dataset.row)] = Number(radio.value);
+    else if (phase === 'p2') session.ratings2[Number(radio.dataset.pos)] = Number(radio.value);
+    refreshWarning();
+  });
+  panel.addEventListener('click', e => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    const now = Date.now();
+    if (tick(now) || !panel.contains(b)) return;
+    if (b.dataset.rank && phase === 'p1') {
+      const rank = session.ranks[page], key = b.dataset.rank, row = Number(b.dataset.row);
+      const other = key === 'far' ? 'near' : 'far';
+      // 추정: 같은 셀 재클릭은 해제하고 같은 행 반대 버튼은 교체한다. 평정은 동점과 상대선택 불일치를 그대로 허용한다.
+      rank[key] = rank[key] === row ? null : row;
+      if (rank[key] !== null && rank[other] === row) rank[other] = null;
+      panel.querySelectorAll('[data-rank]').forEach(btn => btn.setAttribute('aria-pressed', String(rank[btn.dataset.rank] === Number(btn.dataset.row))));
+      refreshWarning();
+      return;
+    }
+    if (!b.dataset.action || now < lockedUntil) return;
+    lockedUntil = now + 800;
+    if (b.dataset.action === 'ready') advancePhase(now);
+    else if (!pageComplete() && !warned) {
+      // 추정: 미응답을 한 번 안내한 뒤에는 사용자가 그대로 진행할 수 있게 한다.
+      warned = true;
+      $('skip-msg').textContent = '답하지 않은 문항이 있어요';
+      b.textContent = nextLabel();
+    } else if (finalPage()) advancePhase(now);
+    else {
+      rememberGroup(now);
+      page++;
+      warned = false;
+      openedAt = now;
+      renderPage();
+      topFocus('phase-heading');
+    }
+    tick(now);
+  });
+  $('intro').addEventListener('click', e => {
+    const b = e.target.closest('button[data-mode]');
+    if (b) start(b.dataset.mode);
+  });
+  $('results-back').addEventListener('click', () => {
+    session = null;
+    phase = 'home';
+    $('panel').replaceChildren();
+    $('results').replaceChildren();
+    showView('intro');
+    DeepResults.history($('home-history'));
+    topFocus('intro-heading');
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) tick(Date.now()); });
+  window.addEventListener('pageshow', () => tick(Date.now()));
+  DeepResults.history($('home-history'));
+})();
+  </script>
+</body>
+</html>
